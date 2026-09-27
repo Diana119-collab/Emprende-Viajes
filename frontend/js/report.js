@@ -21,6 +21,22 @@ function headerStyle(cell) {
   cell.alignment = { horizontal: 'center', vertical: 'middle' };
 }
 
+/**
+ * Estilos del gráfico, embebidos a mano: el SVG de `barChart` se apoya en clases CSS
+ * (`.chart .bar rect { fill: var(--teal) }`, etc.) que solo existen en `styles.css`. Al
+ * rasterizarlo aislado (como imagen `data:` independiente, fuera del documento) esas
+ * reglas no aplican y el navegador cae a sus valores por defecto — texto y barras en
+ * negro sólido. Por eso se incrusta aquí una copia de esas reglas, con colores fijos
+ * (paleta clara, para que el reporte se vea bien sin depender del tema del navegador).
+ */
+const CHART_STYLE = `<style>
+  .axis { stroke: #cfd9e6; stroke-width: 1.5; }
+  .bar rect { fill: #12a5a5; }
+  .bar.sel rect { fill: #f28c28; }
+  .bar-v { font: 700 11px Arial, Helvetica, sans-serif; fill: #33455e; }
+  .bar-l { font: 12px Arial, Helvetica, sans-serif; fill: #5a6c83; text-transform: capitalize; }
+</style>`;
+
 /** Rasteriza el SVG del gráfico de barras (el mismo `barChart` de la pantalla) a un PNG en memoria. */
 function svgToPngDataUrl(svgHtml, width, height, scale = 2) {
   return new Promise((resolve, reject) => {
@@ -29,6 +45,7 @@ function svgToPngDataUrl(svgHtml, width, height, scale = 2) {
     const svg = wrap.querySelector('svg');
     svg.setAttribute('width', width);
     svg.setAttribute('height', height);
+    svg.insertAdjacentHTML('afterbegin', CHART_STYLE);
     const xml = new XMLSerializer().serializeToString(svg);
     const svg64 = btoa(unescape(encodeURIComponent(xml)));
     const img = new Image();
