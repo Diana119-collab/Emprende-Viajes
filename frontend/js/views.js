@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import {
   STATUSES, STATUS_LABEL, NEXT_ACTION, COMMISSION_RATE, DESTINATIONS, TICKET_CATEGORIES, HttpError, validateSale, computeSaleMoney, daysBetween,
-  DOC_ITEMS, REQUIREMENT_ITEMS, COMPONENT_TYPES, INCIDENT_ACTIONS,
+  DOC_ITEMS, REQUIREMENT_ITEMS, COMPONENT_TYPES, INCIDENT_ACTIONS, HOTEL_TIER_LABEL,
 } from './core.js';
 import {
   $, $$, esc, money, fmtDate, monthNameCap, avatar, statusBadge, commBadge, icon, toast, openModal, closeModal,
@@ -689,31 +689,70 @@ export async function clientes(root) {
 async function openClientDrawer(id) {
   const c = await api.client(id);
   const total = c.sales.reduce((t, s) => t + s.amount, 0);
+  const lastSg = c.suggestions && c.suggestions.length ? c.suggestions[c.suggestions.length - 1] : null;
   openModal(`<div class="drawer-head"><p class="eyebrow">Cliente ${esc(c.id)}</p><h2>${esc(c.name)}</h2></div>
-    <div class="person">${avatar(c.name, 48)}<div class="contact">${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s/g, ''))}">${icon.phone}${esc(c.phone)}</a>` : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${icon.mail}${esc(c.email)}</a>` : ''}</div></div>
+    <div class="person">${avatar(c.name, 48)}<div><div class="contact">${c.phone ? `<a href="tel:${esc(c.phone.replace(/\s/g, ''))}">${icon.phone}${esc(c.phone)}</a>` : ''}${c.email ? `<a href="mailto:${esc(c.email)}">${icon.mail}${esc(c.email)}</a>` : ''}</div></div>
+      <button type="button" class="btn ghost tiny" data-edit-client>${icon.edit} Editar</button></div>
     <div class="money-box"><div><span>Ventas</span><strong>${c.sales.length}</strong></div><div class="hl"><span>Total vendido</span><strong>${money(total)}</strong></div></div>
+
+    <section class="profile-block">
+      <h3 class="mini-title">${icon.sparkle} Perfil de viajero</h3>
+      <p class="hint">${esc(c.profile.summary)}</p>
+      ${c.profile.topTags.length ? `<div class="tag-row">${c.profile.topTags.map((t) => `<span class="chip">${icon.tag}${esc(t.label)}</span>`).join('')}</div>` : ''}
+    </section>
+
+    <section class="suggest-block">
+      <h3 class="mini-title">${icon.sparkle} Paquetes sugeridos para ${esc(c.name.split(' ')[0])}</h3>
+      ${c.recommendedPackages.length ? `<ul class="pkg-list">${c.recommendedPackages.map((p) => `<li class="pkg-card">
+        <div class="pkg-main"><strong>${esc(p.destination)}</strong><small>${esc(p.country)} · desde ${money(p.priceFrom)} · ${esc(HOTEL_TIER_LABEL[p.hotelTier])}</small>
+        <p class="hint">${esc(p.reason)}</p></div>
+        <div class="pkg-actions">
+          <button type="button" class="btn ghost tiny" data-send-pkg="${esc(p.id)}" data-channel="whatsapp" data-reason="${esc(p.reason)}">${icon.chat} WhatsApp</button>
+          <button type="button" class="btn ghost tiny" data-send-pkg="${esc(p.id)}" data-channel="email" data-reason="${esc(p.reason)}">${icon.mail} Correo</button>
+        </div></li>`).join('')}</ul>`
+        : '<p class="hint">Aún no hay viajes registrados para sugerir algo a la medida.</p>'}
+      ${lastSg ? `<p class="hint">${icon.check} Última sugerencia enviada: ${esc(fmtDate(lastSg.at))} (${esc(lastSg.channel === 'whatsapp' ? 'WhatsApp' : 'correo')}).</p>` : ''}
+    </section>
+
     <h3 class="mini-title">Historial</h3>
     ${c.sales.length ? `<ul class="list">${c.sales.map((s) => `<li><button class="list-row" data-sale="${esc(s.id)}"><span class="lr-main"><strong>${esc(s.destination)}</strong><small>${esc(fmtDate(s.saleDate))} · ${money(s.amount)}</small></span>${statusBadge(s.status)}</button></li>`).join('')}</ul>` : '<p class="hint">Todavía no tiene ventas.</p>'}
     <button class="btn accent block" data-newsale>Nueva venta para ${esc(c.name.split(' ')[0])} ${icon.arrow}</button>`, {
     drawer: true, label: `Cliente ${c.name}`,
-    onMount: (r) => { $('[data-newsale]', r).onclick = () => { prefillClient(c); closeModal(true); shared.go('#/venta'); }; },
+    onMount: (r) => {
+      $('[data-newsale]', r).onclick = () => { prefillClient(c); closeModal(true); shared.go('#/venta'); };
+      $('[data-edit-client]', r).onclick = () => openClientForm(async () => { closeModal(true); await openClientDrawer(id); }, c);
+      $$('[data-send-pkg]', r).forEach((b) => {
+        b.onclick = async () => {
+          b.disabled = true;
+          try {
+            await api.sendClientSuggestion(id, { channel: b.dataset.channel, packageIds: [b.dataset.sendPkg], note: b.dataset.reason });
+            toast(`Sugerencia enviada por ${b.dataset.channel === 'whatsapp' ? 'WhatsApp' : 'correo'} (demo).`);
+            closeModal(true); await openClientDrawer(id);
+          } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+        };
+      });
+    },
   });
 }
 
-function openClientForm(onDone) {
-  openModal(`<h2>Nuevo cliente</h2><form id="cf" class="form" novalidate>
-    <label class="field"><span>Nombre completo</span><input name="name" autocomplete="off"><span class="err" data-e="name"></span></label>
-    <div class="row2"><label class="field"><span>Teléfono</span><input name="phone" type="tel" inputmode="tel"><span class="err" data-e="phone"></span></label>
-    <label class="field"><span>Correo <em>(opcional)</em></span><input name="email" type="email"><span class="err" data-e="email"></span></label></div>
-    <button class="btn primary block" type="submit">Guardar cliente</button></form>`, {
-    label: 'Nuevo cliente',
+function openClientForm(onDone, existing = null) {
+  const isEdit = !!existing;
+  openModal(`<h2>${isEdit ? 'Editar cliente' : 'Nuevo cliente'}</h2><form id="cf" class="form" novalidate>
+    <label class="field"><span>Nombre completo</span><input name="name" autocomplete="off" value="${esc(existing?.name || '')}"><span class="err" data-e="name"></span></label>
+    <div class="row2"><label class="field"><span>Teléfono</span><input name="phone" type="tel" inputmode="tel" value="${esc(existing?.phone || '')}"><span class="err" data-e="phone"></span></label>
+    <label class="field"><span>Correo <em>(opcional)</em></span><input name="email" type="email" value="${esc(existing?.email || '')}"><span class="err" data-e="email"></span></label></div>
+    <button class="btn primary block" type="submit">${isEdit ? 'Guardar cambios' : 'Guardar cliente'}</button></form>`, {
+    label: isEdit ? `Editar ${existing.name}` : 'Nuevo cliente',
     onMount: (r) => {
       const f = $('#cf', r);
       f.onsubmit = async (ev) => {
         ev.preventDefault();
         $$('[data-e]', f).forEach((x) => { x.textContent = ''; });
-        try { await api.createClient({ name: f.name.value, phone: f.phone.value, email: f.email.value }); toast('Cliente guardado'); closeModal(); onDone(); }
-        catch (e) { if (e.details) Object.entries(e.details).forEach(([k, v]) => { const el = $(`[data-e=${k}]`, f); if (el) el.textContent = v; }); else toast(e.message, 'err'); }
+        try {
+          const payload = { name: f.name.value, phone: f.phone.value, email: f.email.value };
+          if (isEdit) await api.updateClient(existing.id, payload); else await api.createClient(payload);
+          toast(isEdit ? 'Cliente actualizado' : 'Cliente guardado'); closeModal(); onDone();
+        } catch (e) { if (e.details) Object.entries(e.details).forEach(([k, v]) => { const el = $(`[data-e=${k}]`, f); if (el) el.textContent = v; }); else toast(e.message, 'err'); }
       };
     },
   });

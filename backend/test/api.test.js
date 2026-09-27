@@ -186,6 +186,35 @@ test('Recordatorio al cliente: se registra con fecha y queda en el historial de 
   assert.ok(r.body.reminders[0].at);
 });
 
+test('Editar cliente: PATCH actualiza sus datos y los propaga a sus ventas', async () => {
+  const created = (await j('POST', '/sales', validSale())).body;
+  const r = await j('PATCH', `/clients/${created.clientId}`, { name: 'María Pérez G.', phone: '999 111 222', email: 'maria.g@mail.com' });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.name, 'María Pérez G.');
+  const sale = (await j('GET', `/sales/${created.id}`)).body;
+  assert.equal(sale.client.name, 'María Pérez G.');
+  assert.equal(sale.client.email, 'maria.g@mail.com');
+});
+
+test('Perfil de viajero y paquetes sugeridos: detecta gustos por destino y sugiere del catálogo', async () => {
+  const client = (await j('POST', '/clients', { name: 'Viajero Playa', phone: '999 222 333' })).body;
+  await j('POST', '/sales', validSale({ client: { name: 'Viajero Playa', phone: '999 222 333' }, destination: 'Cancún', country: 'México', amount: 6000, cost: 4800, passengers: 2 }));
+  const r = await j('GET', `/clients/${client.id}`);
+  assert.equal(r.status, 200);
+  assert.ok(r.body.profile.topTags.some((t) => t.key === 'playa'));
+  assert.ok(r.body.recommendedPackages.length > 0);
+  assert.ok(r.body.recommendedPackages.every((p) => p.reason));
+});
+
+test('Enviar sugerencia de paquete al cliente: queda registrada con fecha y canal', async () => {
+  const client = (await j('POST', '/clients', { name: 'Cliente Sugerido', phone: '999 333 444' })).body;
+  const r = await j('POST', `/clients/${client.id}/suggestions`, { channel: 'email', packageIds: ['PKG-01'], note: 'Te puede interesar' });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.suggestions.length, 1);
+  assert.equal(r.body.suggestions[0].channel, 'email');
+  assert.equal(r.body.suggestions[0].packages[0].id, 'PKG-01');
+});
+
 test('Centro de incidencias: crea, detecta conflicto con el traslado y se resuelve', async () => {
   const created = (await j('POST', '/sales', validSale())).body;
   const inc = await j('POST', '/incidents', {

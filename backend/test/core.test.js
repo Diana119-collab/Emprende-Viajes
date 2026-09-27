@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { seedDb, migrateDb, createEngine } from '../../frontend/js/core.js';
+import { seedDb, migrateDb, createEngine, estimateHotelTier } from '../../frontend/js/core.js';
 
 test('migrateDb repara una base de datos guardada antes de los módulos de viaje internacional', () => {
   const old = {
@@ -44,4 +44,32 @@ test('seedDb ya incluye varios incidentes de ejemplo (vuelos con retraso y un ca
   assert.ok(problems.some((p) => p.includes('vuelo')));
   assert.ok(problems.some((p) => !p.includes('vuelo')));
   assert.ok(db.incidents.some((i) => i.status === 'resuelta'));
+});
+
+test('estimateHotelTier clasifica por monto de venta por pasajero', () => {
+  assert.equal(estimateHotelTier(1000, 2), 'economico'); // 500/pax
+  assert.equal(estimateHotelTier(3000, 2), 'estandar'); // 1500/pax
+  assert.equal(estimateHotelTier(6000, 2), 'lujo'); // 3000/pax
+});
+
+test('travelerProfile detecta el gusto por playa y sugiere paquetes acordes; editar cliente actualiza sus ventas', () => {
+  const db = seedDb();
+  const engine = createEngine(db, { save: () => {} });
+  // Ana Torres (C-03): Punta Cana (playa) y Cusco (aventura/naturaleza/cultura).
+  const profile = engine.travelerProfile('C-03');
+  assert.equal(profile.sampleSize, 2);
+  assert.ok(profile.topTags.some((t) => t.key === 'playa'));
+  assert.ok(profile.summary.length > 0);
+
+  const suggestions = engine.suggestPackages('C-03');
+  assert.ok(suggestions.length > 0);
+  assert.ok(suggestions.every((p) => p.reason));
+
+  const updated = engine.updateClient('C-03', { name: 'Ana Torres V.', phone: '985 333 444', email: 'ana.v@email.com' });
+  assert.equal(updated.name, 'Ana Torres V.');
+  assert.ok(db.sales.filter((s) => s.clientId === 'C-03').every((s) => s.client.name === 'Ana Torres V.'));
+
+  const sent = engine.sendClientSuggestion('C-03', { channel: 'whatsapp', packageIds: [suggestions[0].id], note: suggestions[0].reason });
+  assert.equal(sent.suggestions.length, 1);
+  assert.equal(sent.suggestions[0].packages[0].id, suggestions[0].id);
 });

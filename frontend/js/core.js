@@ -71,6 +71,58 @@ export const DESTINATIONS = [
   ['París', 'Francia'], ['Roma', 'Italia'], ['Santiago', 'Chile'],
 ].map(([name, country]) => ({ name, country }));
 
+/* ---------- perfil del viajero y paquetes sugeridos ---------- */
+/** Categorías de interés que se detectan a partir de los destinos que ya compró el cliente. */
+export const TRIP_TAGS = [
+  { key: 'playa', label: 'Playa' },
+  { key: 'aventura', label: 'Aventura' },
+  { key: 'naturaleza', label: 'Naturaleza' },
+  { key: 'cultura', label: 'Cultura y ciudad' },
+  { key: 'festivales', label: 'Festivales y conciertos' },
+];
+export const TRIP_TAG_LABEL = Object.fromEntries(TRIP_TAGS.map((t) => [t.key, t.label]));
+/** Qué tipo de viaje ofrece cada destino que ya manejamos (para leer el gusto del cliente). */
+const DESTINATION_TAGS = {
+  'cancun': ['playa'],
+  'punta cana': ['playa'],
+  'madrid': ['cultura', 'festivales'],
+  'nueva york': ['cultura', 'festivales'],
+  'miami': ['playa', 'festivales'],
+  'rio de janeiro': ['playa', 'festivales', 'naturaleza'],
+  'buenos aires': ['cultura', 'festivales'],
+  'cartagena': ['playa', 'cultura'],
+  'cusco': ['aventura', 'naturaleza', 'cultura'],
+  'paris': ['cultura'],
+  'roma': ['cultura'],
+  'santiago': ['naturaleza', 'aventura'],
+  'tulum': ['playa', 'naturaleza'],
+  'bariloche': ['aventura', 'naturaleza'],
+  'ibiza': ['playa', 'festivales'],
+  'san pedro de atacama': ['naturaleza', 'aventura'],
+};
+/** Nivel de hotel: no lo pide el formulario todavía, así que lo estimamos con el monto de venta por pasajero. */
+export const HOTEL_TIERS = ['economico', 'estandar', 'lujo'];
+export const HOTEL_TIER_LABEL = { economico: 'Económico', estandar: 'Estándar', lujo: 'Lujo / 5 estrellas' };
+export function estimateHotelTier(amount, passengers) {
+  const perPax = passengers > 0 ? amount / passengers : amount;
+  if (perPax >= 2600) return 'lujo';
+  if (perPax >= 1300) return 'estandar';
+  return 'economico';
+}
+/** Catálogo de paquetes de ejemplo que el agente puede sugerir según el perfil del cliente. */
+export const PACKAGE_CATALOG = [
+  { id: 'PKG-01', destination: 'Cancún', country: 'México', tags: ['playa'], hotelTier: 'lujo', priceFrom: 5200, blurb: 'Resort todo incluido frente al mar, ideal para descansar.' },
+  { id: 'PKG-02', destination: 'Tulum', country: 'México', tags: ['playa', 'naturaleza'], hotelTier: 'estandar', priceFrom: 3600, blurb: 'Playas de arena blanca, cenotes y zona arqueológica frente al mar.' },
+  { id: 'PKG-03', destination: 'Cusco y Valle Sagrado', country: 'Perú', tags: ['aventura', 'naturaleza', 'cultura'], hotelTier: 'estandar', priceFrom: 2100, blurb: 'Trekking, Machu Picchu y mercados andinos.' },
+  { id: 'PKG-04', destination: 'Bariloche', country: 'Argentina', tags: ['aventura', 'naturaleza'], hotelTier: 'lujo', priceFrom: 4800, blurb: 'Montaña, lagos y actividades al aire libre con hoteles boutique.' },
+  { id: 'PKG-05', destination: 'Ibiza', country: 'España', tags: ['playa', 'festivales'], hotelTier: 'lujo', priceFrom: 6200, blurb: 'Playas y la mejor vida nocturna con festivales de música electrónica.' },
+  { id: 'PKG-06', destination: 'Río de Janeiro (Carnaval)', country: 'Brasil', tags: ['festivales', 'playa'], hotelTier: 'estandar', priceFrom: 4300, blurb: 'Carnaval, playas icónicas y la energía carioca.' },
+  { id: 'PKG-07', destination: 'Coachella / Palm Springs', country: 'EE.UU.', tags: ['festivales'], hotelTier: 'lujo', priceFrom: 7800, blurb: 'Uno de los festivales de música más grandes del mundo.' },
+  { id: 'PKG-08', destination: 'Cartagena de Indias', country: 'Colombia', tags: ['playa', 'cultura'], hotelTier: 'economico', priceFrom: 2200, blurb: 'Centro histórico colonial y playas del Caribe, buena relación precio-calidad.' },
+  { id: 'PKG-09', destination: 'San Pedro de Atacama', country: 'Chile', tags: ['naturaleza', 'aventura'], hotelTier: 'economico', priceFrom: 1900, blurb: 'Desierto, géiseres y cielos para observación de estrellas.' },
+  { id: 'PKG-10', destination: 'París + Roma', country: 'Europa', tags: ['cultura'], hotelTier: 'lujo', priceFrom: 8900, blurb: 'Lo clásico de Europa: museos, arquitectura y gastronomía.' },
+];
+
 export class HttpError extends Error {
   constructor(status, message, details) {
     super(message);
@@ -137,6 +189,28 @@ export function travelReasonText({ level, daysLeft, missing }) {
   return `Pendiente: falta${n === 1 ? '' : 'n'} ${n} ítem${n === 1 ? '' : 's'} antes del viaje (sale ${when}): ${items}.`;
 }
 
+/* ---------- perfil del viajero (explicaciones en texto) ---------- */
+/** Frase que resume el perfil detectado, para mostrarla o para usarla como nota al enviar una sugerencia. */
+/** Une una lista al estilo español: "a, b y c" (o "a y b" con dos, o "a" con una sola). */
+function joinEs(items) {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}`;
+}
+export function profileSummaryText({ topTags, hotelTier, sampleSize }) {
+  if (!sampleSize) return 'Todavía no tiene viajes registrados; aún no podemos detectar sus preferencias.';
+  const tagsPart = topTags.length ? `Le gusta${topTags.length === 1 ? '' : 'n'}: ${joinEs(topTags.map((t) => t.label.toLowerCase()))}` : 'Sus viajes no siguen un patrón claro todavía';
+  return `${tagsPart}. Suele reservar hoteles ${HOTEL_TIER_LABEL[hotelTier].toLowerCase()}.`;
+}
+/** Por qué se sugiere este paquete puntual a este cliente. */
+export function packageReasonText(pkg, profile) {
+  const matched = pkg.tags.filter((t) => profile.topTags.some((pt) => pt.key === t)).map((t) => TRIP_TAG_LABEL[t]);
+  const sameTier = pkg.hotelTier === profile.hotelTier;
+  if (!matched.length && !profile.sampleSize) return 'Una opción popular para conocer sus gustos con el primer viaje.';
+  if (!matched.length) return 'Una alternativa distinta a lo que ha comprado antes, para ofrecerle variedad.';
+  const tierPart = sameTier ? ` y suele elegir hoteles ${HOTEL_TIER_LABEL[pkg.hotelTier].toLowerCase()}` : '';
+  return `Porque en sus últimos viajes buscó ${joinEs(matched.map((m) => m.toLowerCase()))}${tierPart}.`;
+}
+
 /* ---------- validación ---------- */
 export function validateSale(p, today) {
   const errors = {};
@@ -197,7 +271,7 @@ export function seedDb(now = new Date()) {
     ['Rosa Quispe', '981 212 323', 'rosa.quispe@email.com'],
     ['Diego Paredes', '980 434 545', ''],
   ].map(([name, phone, email], i) => ({
-    id: `C-${pad(i + 1)}`, name, phone, email, createdAt: today,
+    id: `C-${pad(i + 1)}`, name, phone, email, createdAt: today, suggestions: [],
   }));
 
   // [cliente, destino, país, mesOffset, día, viaje(±días desde hoy), pax, monto, costo, estado]
@@ -325,7 +399,7 @@ export function seedDb(now = new Date()) {
         status: 'resuelta', createdAt: today,
       },
     ],
-    seq: { sale: 1001 + rows.length, client: clients.length + 1, ticket: 2, itin: 3, incident: 5, reminder: 1 },
+    seq: { sale: 1001 + rows.length, client: clients.length + 1, ticket: 2, itin: 3, incident: 5, reminder: 1, suggestion: 1 },
   };
 }
 
@@ -336,7 +410,7 @@ export function seedDb(now = new Date()) {
  */
 export function migrateDb(db) {
   db.agent = db.agent || { name: 'Magda', role: 'Ejecutiva de Viajes', commissionRate: COMMISSION_RATE };
-  db.clients = db.clients || [];
+  db.clients = (db.clients || []).map((c) => ({ ...c, suggestions: c.suggestions || [] }));
   db.sales = (db.sales || []).map((s) => ({
     ...s,
     docs: s.docs || {},
@@ -354,6 +428,7 @@ export function migrateDb(db) {
   db.seq.itin = db.seq.itin || 1;
   db.seq.incident = db.seq.incident || (db.incidents.length + 1);
   db.seq.reminder = db.seq.reminder || 1;
+  db.seq.suggestion = db.seq.suggestion || 1;
   return db;
 }
 
@@ -506,7 +581,89 @@ export function createEngine(db, { save = () => {}, now = () => new Date() } = {
     getClient(id) {
       const c = db.clients.find((x) => x.id === id);
       if (!c) throw new HttpError(404, 'Cliente no encontrado');
-      return { ...c, sales: db.sales.filter((s) => s.clientId === id).map(withCommission) };
+      return {
+        ...c,
+        suggestions: c.suggestions || [],
+        sales: db.sales.filter((s) => s.clientId === id).map(withCommission),
+        profile: engine.travelerProfile(id),
+        recommendedPackages: engine.suggestPackages(id, { limit: 3 }),
+      };
+    },
+
+    /** Edita los datos de contacto de un cliente (el agente los mantiene actualizados). */
+    updateClient(id, patch) {
+      const c = db.clients.find((x) => x.id === id);
+      if (!c) throw new HttpError(404, 'Cliente no encontrado');
+      const name = String(patch?.name ?? c.name).trim();
+      const phone = String(patch?.phone ?? c.phone).trim();
+      const email = String(patch?.email ?? c.email).trim();
+      const errors = {};
+      if (name.length < 3) errors.name = 'Ingresa el nombre completo.';
+      if (digits(phone).length < 7 || digits(phone).length > 15) errors.phone = 'Ingresa un teléfono válido.';
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Correo inválido.';
+      if (Object.keys(errors).length) throw new HttpError(400, 'Datos inválidos', errors);
+      if (db.clients.some((x) => x.id !== id && digits(x.phone) === digits(phone))) {
+        throw new HttpError(409, 'Ya existe un cliente con ese teléfono', { phone: 'Teléfono ya registrado.' });
+      }
+      c.name = name; c.phone = phone; c.email = email;
+      // Las ventas guardan una copia de los datos de contacto; se actualizan para que no queden desfasadas.
+      db.sales.forEach((s) => { if (s.clientId === id) s.client = { name, phone, email }; });
+      commit();
+      return c;
+    },
+
+    /** Analiza el historial de compras del cliente: qué tipo de destinos prefiere y en qué categoría de hotel. */
+    travelerProfile(id) {
+      const c = db.clients.find((x) => x.id === id);
+      if (!c) throw new HttpError(404, 'Cliente no encontrado');
+      const sales = db.sales.filter((s) => s.clientId === id).sort((a, b) => a.travelDate.localeCompare(b.travelDate));
+      const tagCount = {};
+      const tierCount = {};
+      const destinations = sales.map((s) => {
+        const tags = DESTINATION_TAGS[norm(s.destination)] || [];
+        tags.forEach((t) => { tagCount[t] = (tagCount[t] || 0) + 1; });
+        const tier = estimateHotelTier(s.amount, s.passengers);
+        tierCount[tier] = (tierCount[tier] || 0) + 1;
+        return { destination: s.destination, country: s.country, travelDate: s.travelDate, tags, tier };
+      }).sort((a, b) => b.travelDate.localeCompare(a.travelDate));
+      // Top 3 por conteo, pero sin cortar a la mitad un empate en el 3er lugar (p. ej. dos viajes con
+      // dos categorías cada uno, todas con el mismo conteo).
+      const ranked = Object.entries(tagCount).sort((a, b) => b[1] - a[1]);
+      const cutoff = ranked[2]?.[1] ?? 0;
+      const topTags = ranked.filter(([, count], i) => i < 3 || count === cutoff)
+        .map(([key, count]) => ({ key, label: TRIP_TAG_LABEL[key], count }));
+      const hotelTier = Object.entries(tierCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'estandar';
+      const profile = { clientId: id, sampleSize: sales.length, topTags, hotelTier, hotelTierLabel: HOTEL_TIER_LABEL[hotelTier], destinations };
+      return { ...profile, summary: profileSummaryText(profile) };
+    },
+
+    /** Elige del catálogo los paquetes que más calzan con el perfil del cliente, para ofrecérselos. */
+    suggestPackages(id, { limit = 3 } = {}) {
+      const profile = engine.travelerProfile(id);
+      const visited = new Set(db.sales.filter((s) => s.clientId === id).map((s) => norm(s.destination)));
+      const scored = PACKAGE_CATALOG.map((pkg) => {
+        const matchedTags = pkg.tags.filter((t) => profile.topTags.some((pt) => pt.key === t));
+        let score = matchedTags.length * 2;
+        if (pkg.hotelTier === profile.hotelTier) score += 1;
+        if (visited.has(norm(pkg.destination))) score -= 3; // ya lo conoce: bajamos su prioridad
+        return { ...pkg, score, matchedTags };
+      }).sort((a, b) => b.score - a.score || a.priceFrom - b.priceFrom);
+      return scored.slice(0, limit).map((pkg) => ({ ...pkg, reason: packageReasonText(pkg, profile) }));
+    },
+
+    /** Envía (simulado) la sugerencia de uno o más paquetes al cliente, por WhatsApp o correo. */
+    sendClientSuggestion(id, p) {
+      const c = db.clients.find((x) => x.id === id);
+      if (!c) throw new HttpError(404, 'Cliente no encontrado');
+      const channel = ['whatsapp', 'email'].includes(p?.channel) ? p.channel : 'whatsapp';
+      const packageIds = Array.isArray(p?.packageIds) ? p.packageIds.filter(Boolean).slice(0, 5) : [];
+      const packages = PACKAGE_CATALOG.filter((pk) => packageIds.includes(pk.id))
+        .map((pk) => ({ id: pk.id, destination: pk.destination, country: pk.country }));
+      const note = String(p?.note || '').trim().slice(0, 300);
+      const sg = { id: `SG-${String(db.seq.suggestion++).padStart(3, '0')}`, channel, note, packages, at: today() };
+      c.suggestions = [...(c.suggestions || []), sg];
+      commit();
+      return { ...c, suggestions: c.suggestions };
     },
 
     createClient(p) {
@@ -521,7 +678,7 @@ export function createEngine(db, { save = () => {}, now = () => new Date() } = {
       if (db.clients.some((c) => digits(c.phone) === digits(phone))) {
         throw new HttpError(409, 'Ya existe un cliente con ese teléfono', { phone: 'Teléfono ya registrado.' });
       }
-      const c = { id: `C-${pad(db.seq.client++)}`, name, phone, email, createdAt: today() };
+      const c = { id: `C-${pad(db.seq.client++)}`, name, phone, email, createdAt: today(), suggestions: [] };
       db.clients.push(c);
       commit();
       return c;

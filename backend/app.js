@@ -61,6 +61,10 @@ export function createApp(store) {
     ['GET', '/api/clients', ({ query }) => ({ data: engine().listClients({ q: query.get('q') }) })],
     ['POST', '/api/clients', ({ body }) => ({ status: 201, data: engine().createClient(body) })],
     ['GET', '/api/clients/:id', ({ params }) => ({ data: engine().getClient(params.id) })],
+    ['PATCH', '/api/clients/:id', ({ params, body }) => ({ data: engine().updateClient(params.id, body) })],
+    // Perfil del viajero y paquetes sugeridos
+    ['GET', '/api/clients/:id/profile', ({ params }) => ({ data: { profile: engine().travelerProfile(params.id), recommendedPackages: engine().suggestPackages(params.id) } })],
+    ['POST', '/api/clients/:id/suggestions', ({ params, body }) => ({ status: 201, data: engine().sendClientSuggestion(params.id, body) })],
     ['GET', '/api/commissions', ({ query }) => ({ data: engine().commissions(query.get('month') || undefined) })],
     ['GET', '/api/training', () => ({ data: engine().training() })],
     ['POST', '/api/training/lessons/:id/toggle', ({ params }) => ({ data: engine().toggleLesson(params.id) })],

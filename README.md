@@ -10,7 +10,7 @@ MVP basado en el pitch de Opera Ligero (Startup Weekend): el agente registra ven
 | **Inicio** | Saludo, accesos rápidos, KPIs del mes (ventas, ingresos, comisión) con comparación vs. mes anterior, gráfico de 6 meses, próximo viaje, avance de capacitación |
 | **Registrar venta** | Asistente de 4 pasos (Cliente → Viaje → Detalles → Confirmación) con validación, autocompletado de clientes existentes y cálculo de comisión en vivo |
 | **Operaciones** | Seguimiento por estado (En proceso / Confirmada / En viaje / Finalizada), búsqueda y detalle con línea de tiempo |
-| **Clientes** | Cartera con historial de compras; alta de clientes; "nueva venta" desde la ficha |
+| **Clientes** | Cartera con historial de compras; alta y edición de clientes; "nueva venta" desde la ficha; **perfil de viajero** (qué tipo de destino prefiere y en qué categoría de hotel suele reservar, según su historial) con paquetes sugeridos del catálogo, enviables por WhatsApp o correo (demo) |
 | **Comisiones** | Comisión generada / en proceso / pagada por mes, gráfico y exportación a CSV |
 | **Capacitación** | 5 cursos con lecciones marcables y certificación al llegar al 100 % |
 | **Soporte** | Preguntas frecuentes y solicitudes al back office |
@@ -82,7 +82,10 @@ Base: `/api`
 | GET / POST | `/sales` | Listar (`status`, `q`) / crear venta |
 | GET | `/sales/:id` | Detalle |
 | PATCH | `/sales/:id/status` | Cambiar estado `{ "status": "confirmada" }` |
-| GET / POST | `/clients` · GET `/clients/:id` | Clientes |
+| GET / POST | `/clients` · GET `/clients/:id` | Clientes (el detalle incluye `profile` y `recommendedPackages`) |
+| PATCH | `/clients/:id` | Editar los datos de contacto de un cliente |
+| GET | `/clients/:id/profile` | Perfil de viajero (tipo de destino, categoría de hotel) y paquetes sugeridos |
+| POST | `/clients/:id/suggestions` | Enviar (simular) al cliente una sugerencia de paquete(s) por WhatsApp o correo `{ channel, packageIds, note }` |
 | GET | `/commissions?month=YYYY-MM` | Resumen y detalle de comisiones |
 | GET | `/training` · POST `/training/lessons/:id/toggle` | Capacitación |
 | GET / POST | `/tickets` | Soporte |
@@ -100,7 +103,8 @@ Los errores de validación devuelven `400` con `{ error, details: { campo: mensa
 ## Límites actuales del MVP (a decidir en el piloto)
 
 - **Sin autenticación ni multiusuario**: hay un solo agente ("Magda"). El siguiente paso natural es login y un panel de back office.
-- **Los recordatorios al cliente son simulados**: quedan registrados en la venta, pero no se envía un WhatsApp/correo real todavía; falta conectar un proveedor de mensajería.
+- **Los recordatorios y las sugerencias de paquete al cliente son simulados**: quedan registrados (en la venta o en el cliente), pero no se envía un WhatsApp/correo real todavía; falta conectar un proveedor de mensajería.
+- **La categoría de hotel del perfil de viajero es estimada**: no hay un campo de "estrellas" en el registro de venta todavía, así que se infiere del monto de venta por pasajero de cada viaje.
 - **Los estados de las ventas los cambia el back office** en la operación real; el botón "Simular avance" del detalle es solo para demostración.
 - **La comisión pasa a "Pagada" al confirmar la venta** (constante `COMMISSION_PAID_FROM`); ajústala a la política real de pagos.
 - Los datos de ejemplo (clientes, montos) son ficticios.

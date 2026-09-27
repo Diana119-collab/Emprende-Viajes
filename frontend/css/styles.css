@@ -297,6 +297,18 @@ div.bar { height: 8px; background: var(--line); border-radius: 99px; overflow: h
 .tc-pend .qi, .tc-ic-warn { background: var(--warn-bg); color: var(--warn); }
 .tc-ok .qi, .tc-ic-ok { background: var(--good-bg); color: var(--good); }
 
+/* ---------- perfil de viajero y paquetes sugeridos (Clientes) ---------- */
+.person > div:not(.avatar) { flex: 1; min-width: 0; }
+.profile-block, .suggest-block { margin-top: 6px; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--teal-soft); color: var(--teal-ink); border-radius: 999px; padding: 5px 12px; font-size: .82rem; font-weight: 600; }
+.chip .ico { width: 14px; height: 14px; }
+.pkg-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pkg-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: var(--bg); display: grid; gap: 8px; }
+.pkg-main small { display: block; color: var(--muted); margin-top: 2px; }
+.pkg-main p { margin-top: 4px; }
+.pkg-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
 .incident { display: grid; gap: 12px; } .incident.resolved { opacity: .75; }
 .inc-times { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background: var(--bg); border-radius: 12px; padding: 12px; }
 .inc-times > div { display: grid; } .inc-times span { color: var(--muted); font-size: .78rem; } .inc-times strong { font-size: 1.1rem; }

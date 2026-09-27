@@ -85,6 +85,9 @@ export const api = {
   clients: (f = {}) => run('GET', `/clients${qs(f)}`, null, (e) => e.listClients(f)),
   client: (id) => run('GET', `/clients/${id}`, null, (e) => e.getClient(id)),
   createClient: (p) => run('POST', '/clients', p, (e) => e.createClient(p)),
+  updateClient: (id, patch) => run('PATCH', `/clients/${id}`, patch, (e) => e.updateClient(id, patch)),
+  // Perfil del viajero y paquetes sugeridos
+  sendClientSuggestion: (id, payload) => run('POST', `/clients/${id}/suggestions`, payload, (e) => e.sendClientSuggestion(id, payload)),
   commissions: (month) => run('GET', `/commissions${qs({ month })}`, null, (e) => e.commissions(month)),
   training: () => run('GET', '/training', null, (e) => e.training()),
   toggleLesson: (id) => run('POST', `/training/lessons/${id}/toggle`, {}, (e) => e.toggleLesson(id)),

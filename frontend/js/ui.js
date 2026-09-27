@@ -73,6 +73,10 @@ export const icon = {
   route: I('<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 7l4 3-4 3 4 3"/><path d="M12 10h4a3 3 0 000-6"/>'),
   bell: I('<path d="M6 17v-5a6 6 0 1112 0v5l1.6 2.4H4.4z"/><path d="M9.5 21.5a2.5 2.5 0 005 0"/>'),
   logout: I('<path d="M9 6V4a1 1 0 011-1h9a1 1 0 011 1v16a1 1 0 01-1 1h-9a1 1 0 01-1-1v-2"/><path d="M3 12h12M11 8l4 4-4 4"/>'),
+  chat: I('<path d="M4 5h16v11H9l-4 4z"/><path d="M8 9h8M8 12.5h5"/>'),
+  edit: I('<path d="M4 16.5V20h3.5L18 9.5l-3.5-3.5z"/><path d="M13 7l3.5 3.5"/>'),
+  tag: I('<path d="M11 3H4v7l10 10 7-7z"/><circle cx="7.5" cy="7.5" r="1.3" fill="currentColor" stroke="none"/>'),
+  sparkle: I('<path d="M12 3l1.7 4.8L18.5 9.5l-4.8 1.7L12 16l-1.7-4.8L5.5 9.5l4.8-1.7z"/>'),
 };
 
 /* ---------- toasts ---------- */
