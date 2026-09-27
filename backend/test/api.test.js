@@ -177,6 +177,15 @@ test('Itinerario inteligente: agregar y quitar componentes, ordenados por hora',
   assert.equal((await j('POST', `/sales/${created.id}/itinerary`, { title: '' })).status, 400);
 });
 
+test('Recordatorio al cliente: se registra con fecha y queda en el historial de la venta', async () => {
+  const created = (await j('POST', '/sales', validSale())).body;
+  const r = await j('POST', `/sales/${created.id}/reminders`, { channel: 'whatsapp', note: 'Falta el seguro de viaje' });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.reminders.length, 1);
+  assert.equal(r.body.reminders[0].channel, 'whatsapp');
+  assert.ok(r.body.reminders[0].at);
+});
+
 test('Centro de incidencias: crea, detecta conflicto con el traslado y se resuelve', async () => {
   const created = (await j('POST', '/sales', validSale())).body;
   const inc = await j('POST', '/incidents', {

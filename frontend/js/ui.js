@@ -71,6 +71,8 @@ export const icon = {
   globe: I('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/>'),
   wrench: I('<path d="M14.7 6.3a4 4 0 00-5.6 5l-6 6 2 2 6-6a4 4 0 005-5.6l-2.4 2.4-2-2 2.4-2.4z"/>'),
   route: I('<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 7l4 3-4 3 4 3"/><path d="M12 10h4a3 3 0 000-6"/>'),
+  bell: I('<path d="M6 17v-5a6 6 0 1112 0v5l1.6 2.4H4.4z"/><path d="M9.5 21.5a2.5 2.5 0 005 0"/>'),
+  logout: I('<path d="M9 6V4a1 1 0 011-1h9a1 1 0 011 1v16a1 1 0 01-1 1h-9a1 1 0 01-1-1v-2"/><path d="M3 12h12M11 8l4 4-4 4"/>'),
 };
 
 /* ---------- toasts ---------- */

@@ -76,6 +76,8 @@ export function createApp(store) {
     // Módulo 4 · Itinerario inteligente
     ['POST', '/api/sales/:id/itinerary', ({ params, body }) => ({ status: 201, data: engine().addItineraryItem(params.id, body) })],
     ['DELETE', '/api/sales/:id/itinerary/:itemId', ({ params }) => ({ data: engine().removeItineraryItem(params.id, params.itemId) })],
+    // Recordatorios al cliente (apoyo a los módulos 2 y 5)
+    ['POST', '/api/sales/:id/reminders', ({ params, body }) => ({ status: 201, data: engine().sendReminder(params.id, body) })],
     // Módulo 6 · Centro de incidencias internacionales
     ['GET', '/api/incidents', () => ({ data: engine().listIncidents() })],
     ['POST', '/api/incidents', ({ body }) => ({ status: 201, data: engine().createIncident(body) })],

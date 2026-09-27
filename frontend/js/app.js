@@ -6,7 +6,7 @@ const ROUTES = {
   inicio: { title: 'Inicio', icon: 'home', view: V.inicio },
   venta: { title: 'Registrar venta', icon: 'sale', view: V.venta },
   operaciones: { title: 'Operaciones', icon: 'ops', view: V.operaciones },
-  control: { title: 'Travel Control', icon: 'warning', view: V.travelControl },
+  control: { title: 'Control de viajes', icon: 'warning', view: V.travelControl },
   incidencias: { title: 'Incidencias', icon: 'wrench', view: V.incidencias },
   requisitos: { title: 'Travel Requirements', icon: 'globe', view: V.requisitos },
   clientes: { title: 'Clientes', icon: 'users', view: V.clientes },
@@ -83,6 +83,10 @@ async function boot() {
     toast('Datos de ejemplo restablecidos');
     render();
   };
+  $('#logout-btn').onclick = () => {
+    try { sessionStorage.removeItem(AUTH_KEY); } catch { /* modo privado */ }
+    location.reload();
+  };
 
   // Delegación global: abrir detalle de venta desde cualquier lista.
   document.addEventListener('click', (e) => {
@@ -100,7 +104,38 @@ async function boot() {
   render();
 }
 
-boot().catch((e) => {
-  console.error(e);
-  $('#boot').innerHTML = `<p>No pudimos iniciar la aplicación.</p><pre>${esc(e.message)}</pre>`;
-});
+/* ---------- acceso (MVP: contraseña temporal, pendiente de login real del back office) ---------- */
+const AUTH_KEY = 'ev-auth';
+const DEMO_PASSWORD = 'admin';
+const isAuthed = () => { try { return sessionStorage.getItem(AUTH_KEY) === '1'; } catch { return true; } };
+
+function startApp() {
+  $('#app').hidden = false;
+  boot().catch((e) => {
+    console.error(e);
+    $('#boot').innerHTML = `<p>No pudimos iniciar la aplicación.</p><pre>${esc(e.message)}</pre>`;
+  });
+}
+
+function startLogin() {
+  $('#boot')?.remove();
+  const screen = $('#login-screen');
+  screen.hidden = false;
+  const form = $('#login-form', screen);
+  const err = $('#login-err', screen);
+  form.onsubmit = (ev) => {
+    ev.preventDefault();
+    if (form.password.value === DEMO_PASSWORD) {
+      try { sessionStorage.setItem(AUTH_KEY, '1'); } catch { /* modo privado: se pedirá de nuevo al recargar */ }
+      screen.hidden = true;
+      startApp();
+    } else {
+      err.textContent = 'Contraseña incorrecta. Usa "admin" (acceso temporal de demo).';
+      form.password.value = '';
+      form.password.focus();
+    }
+  };
+  form.password.focus();
+}
+
+if (isAuthed()) startApp(); else startLogin();

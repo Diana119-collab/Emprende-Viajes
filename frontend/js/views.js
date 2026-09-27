@@ -26,6 +26,12 @@ const pageHead = (title, sub, actions = '') => `<header class="page-head"><div><
 const empty = (title, text, cta = '') => `<div class="empty"><div class="empty-ico">${icon.plane}</div><h3>${esc(title)}</h3><p>${esc(text)}</p>${cta}</div>`;
 const relDays = (n) => (n === 0 ? 'hoy' : n > 0 ? `en ${n} día${n === 1 ? '' : 's'}` : `hace ${-n} día${n === -1 ? '' : 's'}`);
 
+/** Envía un recordatorio de demo al cliente (WhatsApp/correo simulado) desde una lista, sin abrir el detalle. */
+async function quickRemind(id) {
+  try { await api.sendReminder(id, { channel: 'whatsapp' }); toast('Recordatorio enviado al cliente (demo).'); }
+  catch (e) { toast(e.message, 'err'); }
+}
+
 /* ------------------------------------------------------------------ */
 /* Detalle de venta (drawer)                                          */
 /* ------------------------------------------------------------------ */
@@ -41,6 +47,9 @@ export async function openSaleDrawer(id) {
       <h2>${esc(s.destination)}${s.country ? `, ${esc(s.country)}` : ''}</h2>
       ${statusBadge(s.status)}${s.international ? travelLevelBadge(s.travelLevel) : ''}
     </div>
+    ${s.international && s.travelReason ? `<div class="note ${s.travelLevel === 'critical' ? 'bad' : s.travelLevel === 'pending' ? 'warn' : 'good'}">
+      <strong>${icon.warning} ¿Por qué ${s.travelLevel === 'critical' ? 'está crítico' : s.travelLevel === 'pending' ? 'está pendiente' : 'está al día'}?</strong>
+      <p>${esc(s.travelReason)}</p></div>` : ''}
     <div class="person">${avatar(s.client.name, 48)}<div><strong>${esc(s.client.name)}</strong>
       <div class="contact">${s.client.phone ? `<a href="tel:${esc(s.client.phone.replace(/\s/g, ''))}">${icon.phone}${esc(s.client.phone)}</a>` : ''}
       ${s.client.email ? `<a href="mailto:${esc(s.client.email)}">${icon.mail}${esc(s.client.email)}</a>` : ''}</div></div></div>
@@ -114,7 +123,9 @@ function intlBlock(s) {
       <div class="intl-actions">
         <button type="button" class="btn ghost" data-client-view>${icon.plane} Vista del cliente</button>
         <button type="button" class="btn ghost" data-open-req>${icon.lock} Requisitos migratorios</button>
+        <button type="button" class="btn ghost" data-remind="${esc(s.id)}">${icon.bell} Enviar recordatorio</button>
       </div>
+      ${s.reminders && s.reminders.length ? `<p class="hint">${icon.check} Último recordatorio enviado: ${esc(fmtDate(s.reminders[s.reminders.length - 1].at))} (${esc(s.reminders[s.reminders.length - 1].channel)}).</p>` : ''}
     </section>`;
 }
 
@@ -144,6 +155,15 @@ function bindIntlBlock(root, s) {
   if (cv) cv.onclick = () => { closeModal(true); openClientView(s.id); };
   const rq = $('[data-open-req]', root);
   if (rq) rq.onclick = () => { closeModal(true); openRequirementsModal(s.id); };
+  const rem = $('[data-remind]', root);
+  if (rem) rem.onclick = async () => {
+    rem.disabled = true;
+    try {
+      await api.sendReminder(s.id, { channel: 'whatsapp', note: s.travelReason });
+      toast('Recordatorio enviado al cliente (demo).');
+      closeModal(true); await openSaleDrawer(s.id);
+    } catch (e) { toast(e.message, 'err'); rem.disabled = false; }
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -261,7 +281,7 @@ export function openQuote() {
 let dashMonth = null;
 export async function inicio(root) {
   dashMonth = dashMonth || shared.meta.today.slice(0, 7);
-  const d = await api.dashboard(dashMonth);
+  const [d, tc] = await Promise.all([api.dashboard(dashMonth), api.travelControl()]);
   const delta = (v) => (v == null ? '<span class="delta flat">Sin datos del mes anterior</span>'
     : v === 0 ? '<span class="delta flat">= igual que el mes anterior</span>'
     : `<span class="delta ${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '▲' : '▼'} ${v >= 0 ? '+' : ''}${v}% vs. mes anterior</span>`);
@@ -288,6 +308,20 @@ export async function inicio(root) {
     <a class="qa" href="#/clientes"><span class="qi c-purple">${icon.users}</span><strong>Mis clientes</strong><small>Tu cartera</small></a>
     <a class="qa" href="#/comisiones"><span class="qi c-orange">${icon.coin}</span><strong>Mis comisiones</strong><small>Ingresos y estados</small></a>
   </section>
+
+  ${tc.counts.critical || tc.counts.pending ? `
+  <section class="card">
+    <div class="card-head"><h2>${icon.warning} Control de viajes</h2><a class="link" href="#/control">Ver todo ${icon.arrow}</a></div>
+    <div class="kpis three mini">
+      <div class="kpi ic tc-crit"><span class="qi tc-ic-bad">${icon.warning}</span><div><span>Críticos</span><strong>${tc.counts.critical}</strong></div></div>
+      <div class="kpi ic tc-pend"><span class="qi tc-ic-warn">${icon.warning}</span><div><span>Pendientes</span><strong>${tc.counts.pending}</strong></div></div>
+      <div class="kpi ic tc-ok"><span class="qi tc-ic-ok">${icon.check}</span><div><span>En orden</span><strong>${tc.counts.ok}</strong></div></div>
+    </div>
+    ${tc.critical.length ? `<ul class="list">${[...tc.critical, ...tc.pending].slice(0, 3).map((s) => `<li class="tc-row-item">
+      <button class="list-row tc-row" data-sale="${esc(s.id)}">${avatar(s.client.name, 36)}<span class="lr-main"><strong>${esc(s.destination)}${s.country ? `, ${esc(s.country)}` : ''}</strong><small>${esc(s.client.name)} · Sale ${relDays(s.daysLeft)}</small></span>${travelLevelBadge(s.level)}</button>
+      <button type="button" class="btn ghost tiny tc-remind" data-remind="${esc(s.id)}" title="Enviar recordatorio al cliente">${icon.bell}</button></li>`).join('')}</ul>`
+      : '<p class="hint">No hay viajes internacionales críticos en este momento; revisa los pendientes en Control de viajes.</p>'}
+  </section>` : ''}
 
   <div class="grid-main">
     <section class="card">
@@ -336,6 +370,7 @@ export async function inicio(root) {
   $$('[data-count]', root).forEach((el) => countUp(el, +el.dataset.count, el.dataset.f === 'money' ? money : (v) => String(Math.round(v))));
   $('#dash-month', root).onchange = (e) => { dashMonth = e.target.value; inicio(root); };
   $('[data-qa=quote]', root).onclick = openQuote;
+  $$('[data-remind]', root).forEach((b) => { b.onclick = () => quickRemind(b.dataset.remind); });
   shared.refresh = () => inicio(root);
 }
 
@@ -519,13 +554,15 @@ export async function operaciones(root) {
 /* Módulo 2: International Travel Control                             */
 /* ------------------------------------------------------------------ */
 export async function travelControl(root) {
-  root.innerHTML = `${pageHead('International Travel Control', 'En vez de revisar cada venta manualmente, el sistema te dice qué falta y por qué.')}<div id="tc-body"></div>`;
+  root.innerHTML = `${pageHead('Control de viajes', 'En vez de revisar cada venta manualmente, el sistema te dice qué falta y por qué (International Travel Control).')}<div id="tc-body"></div>`;
   const load = async () => {
     const d = await api.travelControl();
-    const row = (s) => `<li><button class="list-row tc-row" data-sale="${esc(s.id)}">
+    const row = (s) => `<li class="tc-row-item">
+      <button class="list-row tc-row" data-sale="${esc(s.id)}" title="${esc(s.reason || '')}">
       ${avatar(s.client.name, 38)}<span class="lr-main"><strong>${esc(s.destination)}${s.country ? `, ${esc(s.country)}` : ''}</strong>
       <small>${esc(s.client.name)} · Sale ${s.daysLeft != null ? relDays(s.daysLeft) : '—'}</small>
-      <small class="tc-missing">${s.missing.map((m) => esc(m)).join(' · ')}</small></span>${travelLevelBadge(s.level)}</button></li>`;
+      <small class="tc-missing">${s.missing.map((m) => esc(m)).join(' · ')}</small></span>${travelLevelBadge(s.level)}</button>
+      <button type="button" class="btn ghost tiny tc-remind" data-remind="${esc(s.id)}" title="Enviar recordatorio al cliente">${icon.bell}</button></li>`;
     $('#tc-body', root).innerHTML = `
       <div class="kpis three">
         <div class="kpi ic tc-crit"><span class="qi tc-ic-bad">${icon.warning}</span><div><span>Críticos</span><strong>${d.counts.critical}</strong></div></div>
@@ -535,6 +572,7 @@ export async function travelControl(root) {
       ${d.critical.length ? `<section class="card"><h2>${icon.warning} Críticos — salen pronto y les falta algo</h2><ul class="list">${d.critical.map(row).join('')}</ul></section>` : ''}
       ${d.pending.length ? `<section class="card"><h2>Pendientes</h2><ul class="list">${d.pending.map(row).join('')}</ul></section>` : ''}
       ${!d.critical.length && !d.pending.length ? `<section class="card">${empty('Todo en orden', 'No hay viajes internacionales con documentación pendiente en este momento.')}</section>` : ''}`;
+    $$('[data-remind]', root).forEach((b) => { b.onclick = () => quickRemind(b.dataset.remind); });
   };
   shared.refresh = load;
   await load();

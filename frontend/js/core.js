@@ -123,6 +123,19 @@ export function saleTravelLevel(sale, todayISO) {
   const level = !missing.length ? 'ok' : (daysLeft <= CRITICAL_WINDOW_DAYS ? 'critical' : 'pending');
   return { level, missing, daysLeft };
 }
+/** Explica en una frase por qué una venta internacional está crítica, pendiente o al día. */
+export function travelReasonText({ level, daysLeft, missing }) {
+  if (!level || level === 'na') return '';
+  const when = daysLeft == null ? ''
+    : daysLeft === 0 ? 'hoy'
+    : daysLeft > 0 ? `en ${daysLeft} día${daysLeft === 1 ? '' : 's'}`
+    : `hace ${-daysLeft} día${-daysLeft === 1 ? '' : 's'}`;
+  if (level === 'ok') return 'Todo en orden: no falta nada por completar antes del viaje.';
+  const n = missing.length;
+  const items = missing.join(', ');
+  if (level === 'critical') return `Crítico: el viaje sale ${when} y todavía falta${n === 1 ? '' : 'n'} ${n} ítem${n === 1 ? '' : 's'} por completar: ${items}.`;
+  return `Pendiente: falta${n === 1 ? '' : 'n'} ${n} ítem${n === 1 ? '' : 's'} antes del viaje (sale ${when}): ${items}.`;
+}
 
 /* ---------- validación ---------- */
 export function validateSale(p, today) {
@@ -242,6 +255,7 @@ export function seedDb(now = new Date()) {
       docs: DOCS_BY_ROW[i] || {},
       requirements: REQUIREMENTS_BY_ROW[i] || null,
       components,
+      reminders: [],
     };
   });
 
@@ -275,17 +289,72 @@ export function seedDb(now = new Date()) {
       message: 'Quiero registrar un mayorista con el que ya trabajé.', status: 'resuelto', createdAt: today,
       replies: [{ from: 'Soporte', text: 'Escríbenos el nombre y RUC del proveedor y lo damos de alta en el día.', at: today }],
     }],
-    // Centro de incidencias internacionales: ejemplo sobre la venta a Madrid (V-1002), con un vuelo reprogramado
-    // que podría chocar con el traslado ya reservado.
-    incidents: [{
-      id: 'INC-001', saleId: sales[1].id, problem: 'Vuelo retrasado por la aerolínea',
-      originalTime: '14:30', newTime: '17:45', transferTime: '18:30',
-      notes: 'La aerolínea notificó el cambio esta mañana.',
-      actions: Object.fromEntries(INCIDENT_ACTIONS.map((a) => [a.key, false])),
-      status: 'abierta', createdAt: today,
-    }],
-    seq: { sale: 1001 + rows.length, client: clients.length + 1, ticket: 2, itin: 3, incident: 2 },
+    // Centro de incidencias internacionales: ejemplos variados (vuelos con retraso, un caso sin
+    // conflicto de horario, un imprevisto que no es de vuelo y un caso ya resuelto).
+    incidents: [
+      {
+        // Vuelo retrasado por la aerolínea, con conflicto: la nueva hora de llegada choca con el traslado ya reservado.
+        id: 'INC-001', saleId: sales[1].id, problem: 'Vuelo retrasado por la aerolínea',
+        originalTime: '14:30', newTime: '17:45', transferTime: '18:30',
+        notes: 'La aerolínea notificó el cambio esta mañana.',
+        actions: { contactar_proveedor: false, modificar_traslado: false, avisar_cliente: false, asignar: false },
+        status: 'abierta', createdAt: today,
+      },
+      {
+        // Otro vuelo con retraso (aterrizaje reprogramado) que también choca con el traslado.
+        id: 'INC-002', saleId: sales[0].id, problem: 'Vuelo retrasado: aterrizaje reprogramado',
+        originalTime: '09:15', newTime: '12:40', transferTime: '13:00',
+        notes: 'La aerolínea recién confirmó la nueva hora de llegada.',
+        actions: { contactar_proveedor: true, modificar_traslado: false, avisar_cliente: false, asignar: false },
+        status: 'abierta', createdAt: today,
+      },
+      {
+        // Imprevisto que no es de vuelo: overbooking de hotel.
+        id: 'INC-003', saleId: sales[4].id, problem: 'Hotel informó overbooking y reasignó habitación',
+        originalTime: '', newTime: '', transferTime: '',
+        notes: 'Se gestiona el cambio a un hotel equivalente en la misma zona.',
+        actions: { contactar_proveedor: true, modificar_traslado: false, avisar_cliente: false, asignar: false },
+        status: 'abierta', createdAt: today,
+      },
+      {
+        // Vuelo de regreso adelantado, sin traslado registrado (sin conflicto) — ya resuelta.
+        id: 'INC-004', saleId: sales[3].id, problem: 'Vuelo de regreso adelantado por la aerolínea',
+        originalTime: '22:10', newTime: '19:40', transferTime: '',
+        notes: 'Se avisó al cliente y se reprogramó la recogida.',
+        actions: { contactar_proveedor: true, modificar_traslado: true, avisar_cliente: true, asignar: true },
+        status: 'resuelta', createdAt: today,
+      },
+    ],
+    seq: { sale: 1001 + rows.length, client: clients.length + 1, ticket: 2, itin: 3, incident: 5, reminder: 1 },
   };
+}
+
+/**
+ * Repara una base de datos guardada por una versión anterior (localStorage del navegador o
+ * `data/db.json` del backend) para que tenga los campos que agregaron los módulos nuevos.
+ * Sin esto, abrir una sesión vieja rompe pantallas como Incidencias con "db.incidents is undefined".
+ */
+export function migrateDb(db) {
+  db.agent = db.agent || { name: 'Magda', role: 'Ejecutiva de Viajes', commissionRate: COMMISSION_RATE };
+  db.clients = db.clients || [];
+  db.sales = (db.sales || []).map((s) => ({
+    ...s,
+    docs: s.docs || {},
+    requirements: s.requirements || null,
+    components: s.components || [],
+    reminders: s.reminders || [],
+  }));
+  db.training = db.training || { courses: [], completed: [] };
+  db.tickets = db.tickets || [];
+  db.incidents = db.incidents || [];
+  db.seq = db.seq || {};
+  db.seq.sale = db.seq.sale || (1001 + db.sales.length);
+  db.seq.client = db.seq.client || (db.clients.length + 1);
+  db.seq.ticket = db.seq.ticket || (db.tickets.length + 1);
+  db.seq.itin = db.seq.itin || 1;
+  db.seq.incident = db.seq.incident || (db.incidents.length + 1);
+  db.seq.reminder = db.seq.reminder || 1;
+  return db;
 }
 
 /* ---------- motor de negocio ---------- */
@@ -294,14 +363,18 @@ export function createEngine(db, { save = () => {}, now = () => new Date() } = {
   const commit = () => save(db);
   const withCommission = (s) => {
     const travel = saleTravelLevel(s, today());
+    const intl = isInternational(s.country);
+    const checklist = intl ? saleChecklist(s) : [];
     return {
       ...s,
       commissionStatus: STATUSES.indexOf(s.status) >= STATUSES.indexOf(COMMISSION_PAID_FROM) ? 'pagada' : 'en_proceso',
       nextAction: NEXT_ACTION[s.status],
-      international: isInternational(s.country),
-      checklist: isInternational(s.country) ? saleChecklist(s) : [],
+      international: intl,
+      checklist,
       travelLevel: travel.level,
       daysLeft: travel.daysLeft,
+      travelReason: intl ? travelReasonText({ level: travel.level, daysLeft: travel.daysLeft, missing: checklist.filter((c) => !c.ok).map((c) => c.label) }) : '',
+      reminders: s.reminders || [],
     };
   };
   const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
@@ -556,6 +629,17 @@ export function createEngine(db, { save = () => {}, now = () => new Date() } = {
       return withCommission(s);
     },
 
+    /* ---- Recordatorios al cliente (apoyo a los módulos 2 y 5) ---- */
+    sendReminder(id, p) {
+      const s = findSale(id);
+      const channel = ['whatsapp', 'email', 'llamada'].includes(p?.channel) ? p.channel : 'whatsapp';
+      const note = String(p?.note || '').trim().slice(0, 200);
+      const rem = { id: `R-${String(db.seq.reminder++).padStart(3, '0')}`, channel, note, at: today() };
+      s.reminders = [...(s.reminders || []), rem];
+      commit();
+      return withCommission(s);
+    },
+
     /* ---- Módulo 2: International Travel Control ---- */
     travelControl() {
       const items = db.sales.map(withCommission).filter((s) => s.international && s.status !== 'finalizada');
@@ -565,6 +649,7 @@ export function createEngine(db, { save = () => {}, now = () => new Date() } = {
           id: s.id, destination: s.destination, country: s.country, client: s.client,
           travelDate: s.travelDate, daysLeft: s.daysLeft, level: s.travelLevel,
           missing: s.checklist.filter((c) => !c.ok).map((c) => c.label),
+          reason: s.travelReason,
         }));
       const critical = bucket('critical');
       const pending = bucket('pending');

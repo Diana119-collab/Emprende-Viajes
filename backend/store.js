@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { seedDb } from '../frontend/js/core.js';
+import { seedDb, migrateDb } from '../frontend/js/core.js';
 
 /**
  * Persistencia simple en un archivo JSON (suficiente para el piloto).
@@ -10,7 +10,7 @@ import { seedDb } from '../frontend/js/core.js';
 export function createFileStore(file) {
   const load = () => {
     try {
-      return JSON.parse(fs.readFileSync(file, 'utf8'));
+      return migrateDb(JSON.parse(fs.readFileSync(file, 'utf8')));
     } catch {
       const db = seedDb();
       save(db);

@@ -1,4 +1,4 @@
-import { createEngine, seedDb, HttpError } from './core.js';
+import { createEngine, seedDb, migrateDb, HttpError } from './core.js';
 
 /**
  * Capa de datos. Intenta hablar con el backend REST; si no está disponible
@@ -19,7 +19,9 @@ function loadLocal() {
   let db = null;
   const raw = lsGet();
   if (raw) { try { db = JSON.parse(raw); } catch { db = null; } }
-  if (!db) { db = seedDb(); lsSet(JSON.stringify(db)); }
+  if (!db) db = seedDb();
+  db = migrateDb(db); // repara sesiones demo guardadas antes de que existieran los módulos nuevos
+  lsSet(JSON.stringify(db));
   memoryDb = db;
   engine = createEngine(db, { save: (d) => { memoryDb = d; lsSet(JSON.stringify(d)); } });
 }
@@ -98,6 +100,8 @@ export const api = {
   // Módulo 4 · Itinerario inteligente
   addItineraryItem: (id, item) => run('POST', `/sales/${id}/itinerary`, item, (e) => e.addItineraryItem(id, item)),
   removeItineraryItem: (id, itemId) => run('DELETE', `/sales/${id}/itinerary/${itemId}`, null, (e) => e.removeItineraryItem(id, itemId)),
+  // Recordatorios al cliente (apoyo a los módulos 2 y 5)
+  sendReminder: (id, payload) => run('POST', `/sales/${id}/reminders`, payload, (e) => e.sendReminder(id, payload)),
   // Módulo 6 · Centro de incidencias internacionales
   incidents: () => run('GET', '/incidents', null, (e) => e.listIncidents()),
   createIncident: (p) => run('POST', '/incidents', p, (e) => e.createIncident(p)),
