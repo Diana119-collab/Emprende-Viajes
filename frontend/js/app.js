@@ -100,7 +100,7 @@ async function boot() {
   });
 
   window.addEventListener('hashchange', render);
-  $('#boot').remove();
+  $('#boot')?.remove(); // ya se pudo haber quitado antes, al mostrar el login
   render();
 }
 
@@ -113,7 +113,8 @@ function startApp() {
   $('#app').hidden = false;
   boot().catch((e) => {
     console.error(e);
-    $('#boot').innerHTML = `<p>No pudimos iniciar la aplicación.</p><pre>${esc(e.message)}</pre>`;
+    const box = $('#boot') || $('#app');
+    if (box) box.innerHTML = `<p>No pudimos iniciar la aplicación.</p><pre>${esc(e.message)}</pre>`;
   });
 }
 
