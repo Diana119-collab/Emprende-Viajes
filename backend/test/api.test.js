@@ -126,3 +126,67 @@ test('rutas inexistentes y JSON roto devuelven errores limpios', async () => {
   const r = await fetch(`${base}/sales`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{malo' });
   assert.equal(r.status, 400);
 });
+
+/* ---------- módulos de viaje internacional ---------- */
+
+test('ficha de viaje: una venta internacional trae checklist y marcarlo la actualiza', async () => {
+  const created = (await j('POST', '/sales', validSale())).body; // México → internacional
+  assert.equal(created.international, true);
+  assert.equal(created.checklist.length, 6);
+  assert.ok(created.checklist.every((c) => c.ok === false));
+  const r = await j('PATCH', `/sales/${created.id}/docs`, { passport: true, flight: true });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.checklist.find((c) => c.key === 'passport').ok, true);
+  assert.equal(r.body.checklist.find((c) => c.key === 'hotel').ok, false);
+});
+
+test('ficha de viaje: una venta nacional (Perú) no es internacional', async () => {
+  const created = (await j('POST', '/sales', validSale({ destination: 'Cusco', country: 'Perú' }))).body;
+  assert.equal(created.international, false);
+  assert.deepEqual(created.checklist, []);
+});
+
+test('International Travel Control: agrupa por crítico/pendiente/al día', async () => {
+  const r = await j('GET', '/travel-control');
+  assert.equal(r.status, 200);
+  const { counts, critical, pending, ok } = r.body;
+  assert.equal(counts.critical + counts.pending + counts.ok, critical.length + pending.length + ok.length);
+  critical.concat(pending).forEach((s) => assert.ok(s.missing.length > 0));
+});
+
+test('Travel Requirements: semáforo por venta, se puede verificar y persiste', async () => {
+  const created = (await j('POST', '/sales', validSale())).body;
+  const r0 = await j('GET', `/sales/${created.id}/requirements`);
+  assert.equal(r0.body.items.length, 6);
+  assert.ok(r0.body.items.every((it) => it.status === 'pendiente'));
+  const r1 = await j('PATCH', `/sales/${created.id}/requirements/passport`, { status: 'verificado', source: 'migraciones.gob.pe' });
+  assert.equal(r1.body.items.find((it) => it.key === 'passport').status, 'verificado');
+  assert.ok(r1.body.items.find((it) => it.key === 'passport').checkedAt);
+  assert.equal((await j('PATCH', `/sales/${created.id}/requirements/no-existe`, { status: 'verificado' })).status, 404);
+});
+
+test('Itinerario inteligente: agregar y quitar componentes, ordenados por hora', async () => {
+  const created = (await j('POST', '/sales', validSale())).body;
+  await j('POST', `/sales/${created.id}/itinerary`, { type: 'hotel', title: 'Check-in hotel', time: '15:00' });
+  const withFlight = await j('POST', `/sales/${created.id}/itinerary`, { type: 'vuelo', title: 'Vuelo de ida', time: '06:30' });
+  assert.equal(withFlight.body.components.length, 2);
+  assert.equal(withFlight.body.components[0].title, 'Vuelo de ida'); // 06:30 antes que 15:00
+  const itemId = withFlight.body.components[0].id;
+  const after = await j('DELETE', `/sales/${created.id}/itinerary/${itemId}`);
+  assert.equal(after.body.components.length, 1);
+  assert.equal((await j('POST', `/sales/${created.id}/itinerary`, { title: '' })).status, 400);
+});
+
+test('Centro de incidencias: crea, detecta conflicto con el traslado y se resuelve', async () => {
+  const created = (await j('POST', '/sales', validSale())).body;
+  const inc = await j('POST', '/incidents', {
+    saleId: created.id, problem: 'Vuelo retrasado', originalTime: '14:30', newTime: '17:45', transferTime: '18:30',
+  });
+  assert.equal(inc.status, 201);
+  assert.equal(inc.body.conflict, true); // 17:45 + 1h margen > 18:30
+  assert.equal((await j('POST', '/incidents', { saleId: created.id, problem: '' })).status, 400);
+  await j('PATCH', `/incidents/${inc.body.id}/actions/contactar_proveedor`, { done: true });
+  const resolved = await j('PATCH', `/incidents/${inc.body.id}/resolve`);
+  assert.equal(resolved.body.status, 'resuelta');
+  assert.ok(Object.values(resolved.body.actions).every(Boolean));
+});

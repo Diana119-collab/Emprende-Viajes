@@ -26,6 +26,44 @@ export const COMMISSION_PAID_FROM = 'confirmada';
 export const TICKET_CATEGORIES = ['Reservas', 'Documentación', 'Comisiones', 'Herramientas', 'Otro'];
 export const TICKET_PRIORITIES = ['baja', 'media', 'alta'];
 
+/* ---------- módulos de viaje internacional ---------- */
+/** Ficha "Viaje internacional": checklist que se genera por venta. */
+export const DOC_ITEMS = [
+  { key: 'passport', label: 'Pasaporte registrado' },
+  { key: 'flight', label: 'Vuelo confirmado' },
+  { key: 'hotel', label: 'Hotel confirmado' },
+  { key: 'insurance', label: 'Seguro de viaje' },
+  { key: 'transfer', label: 'Traslado confirmado' },
+  { key: 'entryDoc', label: 'Documento de entrada / visa' },
+];
+/** Travel Requirements: semáforo migratorio verificado por el agente contra fuentes oficiales. */
+export const REQUIREMENT_ITEMS = [
+  { key: 'passport', label: 'Pasaporte' },
+  { key: 'visa', label: 'Visa o autorización de ingreso' },
+  { key: 'health', label: 'Requisitos sanitarios' },
+  { key: 'docs', label: 'Documentos y condiciones de entrada' },
+  { key: 'insurance', label: 'Seguro recomendado u obligatorio' },
+  { key: 'restrictions', label: 'Restricciones relevantes' },
+];
+export const REQUIREMENT_STATUSES = ['pendiente', 'verificado', 'no_aplica'];
+/** Itinerario inteligente: tipos de componentes que arma un viaje. */
+export const COMPONENT_TYPES = [
+  { key: 'vuelo', label: 'Vuelo' },
+  { key: 'hotel', label: 'Hotel' },
+  { key: 'traslado', label: 'Traslado' },
+  { key: 'actividad', label: 'Actividad' },
+  { key: 'seguro', label: 'Seguro' },
+];
+/** Centro de incidencias internacionales: acciones sugeridas. */
+export const INCIDENT_ACTIONS = [
+  { key: 'contactar_proveedor', label: 'Contactar proveedor' },
+  { key: 'modificar_traslado', label: 'Modificar traslado' },
+  { key: 'avisar_cliente', label: 'Avisar al cliente' },
+  { key: 'asignar', label: 'Asignar incidencia' },
+];
+/** Días de anticipación desde los que una venta internacional con pendientes pasa a "crítica". */
+export const CRITICAL_WINDOW_DAYS = 5;
+
 export const DESTINATIONS = [
   ['Cancún', 'México'], ['Punta Cana', 'R. Dominicana'], ['Madrid', 'España'],
   ['Nueva York', 'EE.UU.'], ['Miami', 'EE.UU.'], ['Río de Janeiro', 'Brasil'],
@@ -65,6 +103,25 @@ const pct = (cur, prev) => (prev > 0 ? Math.round(((cur - prev) / prev) * 100) :
 export function computeSaleMoney(amount, cost) {
   const profit = round2(Math.max(0, amount - cost));
   return { profit, commission: round2(profit * COMMISSION_RATE) };
+}
+
+/* ---------- Ficha "Viaje internacional" ---------- */
+/** Un viaje es internacional si el país del destino no es Perú (o no se indicó país). */
+export function isInternational(country) {
+  const n = norm(country);
+  return !!n && n !== 'peru';
+}
+export function saleChecklist(sale) {
+  const docs = sale.docs || {};
+  return DOC_ITEMS.map((it) => ({ ...it, ok: !!docs[it.key] }));
+}
+/** Semáforo de International Travel Control: 'ok' | 'pending' | 'critical' | 'na' (no internacional o ya finalizada). */
+export function saleTravelLevel(sale, todayISO) {
+  if (!isInternational(sale.country) || sale.status === 'finalizada') return { level: 'na', missing: [], daysLeft: null };
+  const missing = saleChecklist(sale).filter((c) => !c.ok);
+  const daysLeft = daysBetween(todayISO, sale.travelDate);
+  const level = !missing.length ? 'ok' : (daysLeft <= CRITICAL_WINDOW_DAYS ? 'critical' : 'pending');
+  return { level, missing, daysLeft };
 }
 
 /* ---------- validación ---------- */
@@ -144,10 +201,33 @@ export function seedDb(now = new Date()) {
     [1, 'Cancún', 'México', -4, 10, -110, 2, 3600, 3140, 'finalizada'],
     [2, 'Cusco', 'Perú', -5, 3, -140, 2, 2200, 1900, 'finalizada'],
   ];
+  // Ficha "Viaje internacional": estado de documentos de ejemplo por fila (índice = fila de `rows`).
+  const DOCS_BY_ROW = {
+    0: { passport: true, flight: true, hotel: true, insurance: false, transfer: true, entryDoc: true }, // falta seguro
+    1: { passport: true, flight: false, hotel: false, insurance: false, transfer: false, entryDoc: true }, // recién arrancando
+    2: { passport: true, flight: true, hotel: true, insurance: true, transfer: true, entryDoc: true }, // completo
+    3: { passport: true, flight: true, hotel: true, insurance: true, transfer: false, entryDoc: true }, // ya viajando, falta traslado
+    4: { passport: false, flight: false, hotel: true, insurance: false, transfer: false, entryDoc: false },
+  };
+  // Travel Requirements: semáforo pre-cargado solo para la venta ya lista (Punta Cana) y una a medio verificar (Cancún).
+  const REQUIREMENTS_BY_ROW = {
+    0: REQUIREMENT_ITEMS.map((it, i) => ({ key: it.key, status: i < 3 ? 'verificado' : 'pendiente', source: i < 3 ? 'Cancillería - migraciones.gob.pe' : '', checkedAt: i < 3 ? today : null })),
+    2: REQUIREMENT_ITEMS.map((it) => ({ key: it.key, status: 'verificado', source: 'Embajada R. Dominicana en Perú', checkedAt: today })),
+  };
+  // Itinerario inteligente: componentes de ejemplo para la venta ya confirmada de Punta Cana.
+  const COMPONENTS_BY_ROW = {
+    2: [
+      { id: 'IT-001', type: 'vuelo', title: 'Vuelo Lima → Punta Cana', date: null, time: '06:30', notes: 'Vuelo directo' },
+      { id: 'IT-002', type: 'traslado', title: 'Traslado aeropuerto → hotel', date: null, time: '13:10', notes: '' },
+      { id: 'IT-003', type: 'hotel', title: 'Check-in hotel', date: null, time: '15:00', notes: 'Todo incluido' },
+    ],
+  };
   const sales = rows.map(([ci, destination, country, mOff, day, travelOff, passengers, amount, cost, status], i) => {
     const c = clients[ci];
     const saleDate = clamp(dayInMonth(mOff, day));
     const idx = STATUSES.indexOf(status);
+    const travelDate = toISO(addDays(now, travelOff));
+    const components = (COMPONENTS_BY_ROW[i] || []).map((x) => ({ ...x, date: x.date || travelDate }));
     return {
       id: `V-${1001 + i}`,
       clientId: c.id,
@@ -155,10 +235,13 @@ export function seedDb(now = new Date()) {
       destination, country, passengers, amount, cost,
       ...computeSaleMoney(amount, cost),
       saleDate,
-      travelDate: toISO(addDays(now, travelOff)),
+      travelDate,
       status,
       notes: '',
       history: STATUSES.slice(0, idx + 1).map((s) => ({ status: s, at: saleDate })),
+      docs: DOCS_BY_ROW[i] || {},
+      requirements: REQUIREMENTS_BY_ROW[i] || null,
+      components,
     };
   });
 
@@ -192,7 +275,16 @@ export function seedDb(now = new Date()) {
       message: 'Quiero registrar un mayorista con el que ya trabajé.', status: 'resuelto', createdAt: today,
       replies: [{ from: 'Soporte', text: 'Escríbenos el nombre y RUC del proveedor y lo damos de alta en el día.', at: today }],
     }],
-    seq: { sale: 1001 + rows.length, client: clients.length + 1, ticket: 2 },
+    // Centro de incidencias internacionales: ejemplo sobre la venta a Madrid (V-1002), con un vuelo reprogramado
+    // que podría chocar con el traslado ya reservado.
+    incidents: [{
+      id: 'INC-001', saleId: sales[1].id, problem: 'Vuelo retrasado por la aerolínea',
+      originalTime: '14:30', newTime: '17:45', transferTime: '18:30',
+      notes: 'La aerolínea notificó el cambio esta mañana.',
+      actions: Object.fromEntries(INCIDENT_ACTIONS.map((a) => [a.key, false])),
+      status: 'abierta', createdAt: today,
+    }],
+    seq: { sale: 1001 + rows.length, client: clients.length + 1, ticket: 2, itin: 3, incident: 2 },
   };
 }
 
@@ -200,11 +292,29 @@ export function seedDb(now = new Date()) {
 export function createEngine(db, { save = () => {}, now = () => new Date() } = {}) {
   const today = () => toISO(now());
   const commit = () => save(db);
-  const withCommission = (s) => ({
-    ...s,
-    commissionStatus: STATUSES.indexOf(s.status) >= STATUSES.indexOf(COMMISSION_PAID_FROM) ? 'pagada' : 'en_proceso',
-    nextAction: NEXT_ACTION[s.status],
-  });
+  const withCommission = (s) => {
+    const travel = saleTravelLevel(s, today());
+    return {
+      ...s,
+      commissionStatus: STATUSES.indexOf(s.status) >= STATUSES.indexOf(COMMISSION_PAID_FROM) ? 'pagada' : 'en_proceso',
+      nextAction: NEXT_ACTION[s.status],
+      international: isInternational(s.country),
+      checklist: isInternational(s.country) ? saleChecklist(s) : [],
+      travelLevel: travel.level,
+      daysLeft: travel.daysLeft,
+    };
+  };
+  const toMin = (hhmm) => { const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+  const withIncident = (inc) => {
+    const sale = db.sales.find((x) => x.id === inc.saleId);
+    const newMin = toMin(inc.newTime);
+    const transferMin = toMin(inc.transferTime);
+    const conflict = newMin != null && transferMin != null && (newMin + 60) > transferMin;
+    return {
+      ...inc, conflict,
+      sale: sale ? { id: sale.id, destination: sale.destination, country: sale.country, client: sale.client, travelDate: sale.travelDate } : null,
+    };
+  };
   const findSale = (id) => {
     const s = db.sales.find((x) => x.id === id);
     if (!s) throw new HttpError(404, 'Venta no encontrada');
@@ -394,6 +504,119 @@ export function createEngine(db, { save = () => {}, now = () => new Date() } = {
 
     listTickets() {
       return { items: [...db.tickets].sort((a, b) => b.id.localeCompare(a.id)) };
+    },
+
+    /* ---- Módulo 1: Ficha "Viaje internacional" ---- */
+    updateSaleDocs(id, patch) {
+      const s = findSale(id);
+      const next = { ...(s.docs || {}) };
+      DOC_ITEMS.forEach((it) => { if (patch && Object.prototype.hasOwnProperty.call(patch, it.key)) next[it.key] = !!patch[it.key]; });
+      s.docs = next;
+      commit();
+      return withCommission(s);
+    },
+
+    /* ---- Módulo 3: Travel Requirements (semáforo migratorio) ---- */
+    listRequirements(id) {
+      const s = findSale(id);
+      const base = s.requirements || REQUIREMENT_ITEMS.map((it) => ({ key: it.key, status: 'pendiente', source: '', checkedAt: null }));
+      return {
+        saleId: s.id, destination: s.destination, country: s.country,
+        items: REQUIREMENT_ITEMS.map((it) => ({ ...it, ...(base.find((r) => r.key === it.key) || { status: 'pendiente', source: '', checkedAt: null }) })),
+      };
+    },
+    updateRequirement(id, key, patch) {
+      const s = findSale(id);
+      if (!REQUIREMENT_ITEMS.some((it) => it.key === key)) throw new HttpError(404, 'Requisito no encontrado');
+      const status = REQUIREMENT_STATUSES.includes(patch?.status) ? patch.status : 'pendiente';
+      const source = String(patch?.source || '').trim().slice(0, 200);
+      const base = s.requirements || REQUIREMENT_ITEMS.map((it) => ({ key: it.key, status: 'pendiente', source: '', checkedAt: null }));
+      s.requirements = base.map((r) => (r.key === key ? { key, status, source, checkedAt: status === 'pendiente' ? null : today() } : r));
+      commit();
+      return engine.listRequirements(id);
+    },
+
+    /* ---- Módulo 4: Itinerario inteligente ---- */
+    addItineraryItem(id, p) {
+      const s = findSale(id);
+      const title = String(p?.title || '').trim();
+      if (title.length < 2) throw new HttpError(400, 'Datos inválidos', { title: 'Escribe un título para este ítem.' });
+      const type = COMPONENT_TYPES.some((t) => t.key === p?.type) ? p.type : 'actividad';
+      const time = /^\d{1,2}:\d{2}$/.test(p?.time || '') ? p.time : '00:00';
+      const date = isISODate(p?.date) ? p.date : s.travelDate;
+      const item = { id: `IT-${String(db.seq.itin++).padStart(3, '0')}`, type, title, date, time, notes: String(p?.notes || '').trim().slice(0, 200) };
+      s.components = [...(s.components || []), item].sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+      commit();
+      return withCommission(s);
+    },
+    removeItineraryItem(id, itemId) {
+      const s = findSale(id);
+      s.components = (s.components || []).filter((x) => x.id !== itemId);
+      commit();
+      return withCommission(s);
+    },
+
+    /* ---- Módulo 2: International Travel Control ---- */
+    travelControl() {
+      const items = db.sales.map(withCommission).filter((s) => s.international && s.status !== 'finalizada');
+      const bucket = (level) => items.filter((s) => s.travelLevel === level)
+        .sort((a, b) => a.daysLeft - b.daysLeft)
+        .map((s) => ({
+          id: s.id, destination: s.destination, country: s.country, client: s.client,
+          travelDate: s.travelDate, daysLeft: s.daysLeft, level: s.travelLevel,
+          missing: s.checklist.filter((c) => !c.ok).map((c) => c.label),
+        }));
+      const critical = bucket('critical');
+      const pending = bucket('pending');
+      const ok = bucket('ok');
+      return { counts: { critical: critical.length, pending: pending.length, ok: ok.length }, critical, pending, ok };
+    },
+
+    /* ---- Módulo 6: Centro de incidencias internacionales ---- */
+    listIncidents() {
+      return { items: [...db.incidents].sort((a, b) => b.id.localeCompare(a.id)).map(withIncident) };
+    },
+    getIncident(id) {
+      const inc = db.incidents.find((x) => x.id === id);
+      if (!inc) throw new HttpError(404, 'Incidencia no encontrada');
+      return withIncident(inc);
+    },
+    createIncident(p) {
+      const sale = db.sales.find((x) => x.id === p?.saleId);
+      const errors = {};
+      if (!sale) errors.saleId = 'Elige una venta válida.';
+      const problem = String(p?.problem || '').trim();
+      if (problem.length < 3) errors.problem = 'Describe el problema.';
+      if (Object.keys(errors).length) throw new HttpError(400, 'Datos inválidos', errors);
+      const inc = {
+        id: `INC-${String(db.seq.incident++).padStart(3, '0')}`,
+        saleId: sale.id, problem,
+        originalTime: String(p?.originalTime || '').trim(), newTime: String(p?.newTime || '').trim(), transferTime: String(p?.transferTime || '').trim(),
+        notes: String(p?.notes || '').trim().slice(0, 300),
+        actions: Object.fromEntries(INCIDENT_ACTIONS.map((a) => [a.key, false])),
+        status: 'abierta', createdAt: today(),
+      };
+      db.incidents.push(inc);
+      commit();
+      return withIncident(inc);
+    },
+    updateIncidentAction(id, key, done) {
+      const inc = db.incidents.find((x) => x.id === id);
+      if (!inc) throw new HttpError(404, 'Incidencia no encontrada');
+      if (!INCIDENT_ACTIONS.some((a) => a.key === key)) throw new HttpError(404, 'Acción no encontrada');
+      inc.actions = { ...inc.actions, [key]: !!done };
+      if (Object.values(inc.actions).every(Boolean)) inc.status = 'resuelta';
+      else if (inc.status === 'resuelta') inc.status = 'abierta';
+      commit();
+      return withIncident(inc);
+    },
+    resolveIncident(id) {
+      const inc = db.incidents.find((x) => x.id === id);
+      if (!inc) throw new HttpError(404, 'Incidencia no encontrada');
+      inc.status = 'resuelta';
+      Object.keys(inc.actions).forEach((k) => { inc.actions[k] = true; });
+      commit();
+      return withIncident(inc);
     },
 
     createTicket(p) {

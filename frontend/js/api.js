@@ -88,6 +88,21 @@ export const api = {
   toggleLesson: (id) => run('POST', `/training/lessons/${id}/toggle`, {}, (e) => e.toggleLesson(id)),
   tickets: () => run('GET', '/tickets', null, (e) => e.listTickets()),
   createTicket: (p) => run('POST', '/tickets', p, (e) => e.createTicket(p)),
+  // Módulo 1 · Ficha "Viaje internacional"
+  updateSaleDocs: (id, patch) => run('PATCH', `/sales/${id}/docs`, patch, (e) => e.updateSaleDocs(id, patch)),
+  // Módulo 2 · International Travel Control
+  travelControl: () => run('GET', '/travel-control', null, (e) => e.travelControl()),
+  // Módulo 3 · Travel Requirements
+  requirements: (id) => run('GET', `/sales/${id}/requirements`, null, (e) => e.listRequirements(id)),
+  updateRequirement: (id, key, patch) => run('PATCH', `/sales/${id}/requirements/${key}`, patch, (e) => e.updateRequirement(id, key, patch)),
+  // Módulo 4 · Itinerario inteligente
+  addItineraryItem: (id, item) => run('POST', `/sales/${id}/itinerary`, item, (e) => e.addItineraryItem(id, item)),
+  removeItineraryItem: (id, itemId) => run('DELETE', `/sales/${id}/itinerary/${itemId}`, null, (e) => e.removeItineraryItem(id, itemId)),
+  // Módulo 6 · Centro de incidencias internacionales
+  incidents: () => run('GET', '/incidents', null, (e) => e.listIncidents()),
+  createIncident: (p) => run('POST', '/incidents', p, (e) => e.createIncident(p)),
+  setIncidentAction: (id, key, done) => run('PATCH', `/incidents/${id}/actions/${key}`, { done }, (e) => e.updateIncidentAction(id, key, done)),
+  resolveIncident: (id) => run('PATCH', `/incidents/${id}/resolve`, {}, (e) => e.resolveIncident(id)),
   async reset() {
     if (mode === 'remote') return remote('POST', '/reset', {});
     memoryDb = seedDb(); lsSet(JSON.stringify(memoryDb));

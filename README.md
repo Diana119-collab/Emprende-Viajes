@@ -16,6 +16,17 @@ MVP basado en el pitch de Opera Ligero (Startup Weekend): el agente registra ven
 | **Soporte** | Preguntas frecuentes y solicitudes al back office |
 | Extras | Cotizador rápido, modo oscuro, diseño responsive, accesible por teclado |
 
+### Módulos de viaje internacional
+
+| Módulo | Qué hace |
+|---|---|
+| **Ficha "Viaje internacional"** | Al detectar que el destino no es Perú, arma un checklist (pasaporte, vuelo, hotel, seguro, traslado, documento de entrada) dentro del detalle de la venta; el agente lo va marcando |
+| **International Travel Control** | Agrupa todas las ventas internacionales activas en Críticas / Pendientes / Al día, explicando qué falta en cada una, para no revisarlas una por una |
+| **Travel Requirements** | Semáforo migratorio por venta (pasaporte, visa, sanidad, documentos, seguro, restricciones); el agente lo verifica contra la fuente oficial y anota fuente + fecha — la app organiza, nunca inventa el requisito |
+| **Itinerario inteligente** | El agente arma vuelo, hotel, traslados y actividades por hora; se ordena solo y se muestra en una versión lista para el cliente |
+| **Cliente preparado para viajar** | Vista de solo lectura pensada para compartir con el cliente: días para el viaje, checklist, consejos antes/al llegar/durante y contacto de la agencia |
+| **Centro de incidencias internacionales** | Registra imprevistos (ej. vuelo retrasado) contra una venta, detecta si el nuevo horario choca con el traslado ya reservado y da seguimiento a las acciones (contactar proveedor, modificar traslado, avisar al cliente) |
+
 **Regla de negocio (del pitch):** comisión = **30 % de la utilidad** de cada venta (monto − costo del proveedor). Está en `frontend/js/core.js` (`COMMISSION_RATE`).
 
 ## Arquitectura
@@ -74,6 +85,12 @@ Base: `/api`
 | GET | `/commissions?month=YYYY-MM` | Resumen y detalle de comisiones |
 | GET | `/training` · POST `/training/lessons/:id/toggle` | Capacitación |
 | GET / POST | `/tickets` | Soporte |
+| PATCH | `/sales/:id/docs` | Ficha de viaje: marcar ítems del checklist `{ passport, flight, hotel, insurance, transfer, entryDoc }` |
+| GET | `/travel-control` | International Travel Control: ventas internacionales agrupadas en críticas / pendientes / al día |
+| GET | `/sales/:id/requirements` · PATCH `/sales/:id/requirements/:key` | Travel Requirements: semáforo migratorio por venta `{ status, source }` |
+| POST | `/sales/:id/itinerary` · DELETE `/sales/:id/itinerary/:itemId` | Itinerario inteligente: agregar/quitar un componente `{ type, time, title, notes }` |
+| GET / POST | `/incidents` | Centro de incidencias: listar / registrar `{ saleId, problem, originalTime, newTime, transferTime }` |
+| PATCH | `/incidents/:id/actions/:key` · PATCH `/incidents/:id/resolve` | Marcar una acción `{ done }` / resolver la incidencia |
 | POST | `/reset` | Restablece datos de ejemplo |
 
 Los errores de validación devuelven `400` con `{ error, details: { campo: mensaje } }`.

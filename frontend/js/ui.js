@@ -28,6 +28,16 @@ export const avatar = (name, size = 40) => {
 export const statusBadge = (s) => `<span class="badge st-${s}">${esc(STATUS_LABEL[s] || s)}</span>`;
 export const commBadge = (s) => `<span class="badge ${s === 'pagada' ? 'st-confirmada' : 'st-en_proceso'}">${s === 'pagada' ? 'Pagada' : 'En proceso'}</span>`;
 
+/* ---------- módulos de viaje internacional ---------- */
+const TRAVEL_LEVEL = { critical: ['lvl-bad', 'Crítico'], pending: ['lvl-warn', 'Pendiente'], ok: ['lvl-ok', 'Al día'] };
+export const travelLevelBadge = (level) => { const [cls, label] = TRAVEL_LEVEL[level] || ['lvl-na', '—']; return `<span class="badge ${cls}">${label}</span>`; };
+export const dotStatus = (ok, label) => `<span class="dot-row"><span class="dot-ico ${ok ? 'on' : 'off'}" aria-hidden="true"></span>${label ? `<span>${esc(label)}</span>` : ''}</span>`;
+const REQ_STATUS_LABEL = { verificado: 'Verificado', pendiente: 'Falta verificar', no_aplica: 'No aplica' };
+export const reqBadge = (status) => {
+  const cls = status === 'verificado' ? 'lvl-ok' : status === 'no_aplica' ? 'lvl-na' : 'lvl-warn';
+  return `<span class="badge ${cls}">${esc(REQ_STATUS_LABEL[status] || status)}</span>`;
+};
+
 const I = (d, extra = '') => `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${d}</svg>`;
 export const icon = {
   home: I('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>'),
@@ -57,6 +67,10 @@ export const icon = {
   award: I('<circle cx="12" cy="9" r="5.5"/><path d="M8.5 13.5L7 21l5-2.7 5 2.7-1.5-7.5"/>'),
   lock: I('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 118 0v3"/>'),
   ticket: I('<path d="M3 8a2 2 0 002-2h14a2 2 0 002 2v2a2 2 0 000 4v2a2 2 0 00-2 2H5a2 2 0 00-2-2v-2a2 2 0 000-4z"/><path d="M14 6v12" stroke-dasharray="2 2.5"/>'),
+  warning: I('<path d="M12 3.5l9.5 16.5H2.5z"/><path d="M12 10v4.2M12 17.3v.1"/>'),
+  globe: I('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/>'),
+  wrench: I('<path d="M14.7 6.3a4 4 0 00-5.6 5l-6 6 2 2 6-6a4 4 0 005-5.6l-2.4 2.4-2-2 2.4-2.4z"/>'),
+  route: I('<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8 7l4 3-4 3 4 3"/><path d="M12 10h4a3 3 0 000-6"/>'),
 };
 
 /* ---------- toasts ---------- */

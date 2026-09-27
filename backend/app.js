@@ -14,7 +14,7 @@ const MIME = {
 
 const CORS = {
   'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS',
+  'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
   'access-control-allow-headers': 'content-type',
 };
 
@@ -66,6 +66,21 @@ export function createApp(store) {
     ['POST', '/api/training/lessons/:id/toggle', ({ params }) => ({ data: engine().toggleLesson(params.id) })],
     ['GET', '/api/tickets', () => ({ data: engine().listTickets() })],
     ['POST', '/api/tickets', ({ body }) => ({ status: 201, data: engine().createTicket(body) })],
+    // Módulo 1 · Ficha "Viaje internacional"
+    ['PATCH', '/api/sales/:id/docs', ({ params, body }) => ({ data: engine().updateSaleDocs(params.id, body) })],
+    // Módulo 2 · International Travel Control
+    ['GET', '/api/travel-control', () => ({ data: engine().travelControl() })],
+    // Módulo 3 · Travel Requirements
+    ['GET', '/api/sales/:id/requirements', ({ params }) => ({ data: engine().listRequirements(params.id) })],
+    ['PATCH', '/api/sales/:id/requirements/:key', ({ params, body }) => ({ data: engine().updateRequirement(params.id, params.key, body) })],
+    // Módulo 4 · Itinerario inteligente
+    ['POST', '/api/sales/:id/itinerary', ({ params, body }) => ({ status: 201, data: engine().addItineraryItem(params.id, body) })],
+    ['DELETE', '/api/sales/:id/itinerary/:itemId', ({ params }) => ({ data: engine().removeItineraryItem(params.id, params.itemId) })],
+    // Módulo 6 · Centro de incidencias internacionales
+    ['GET', '/api/incidents', () => ({ data: engine().listIncidents() })],
+    ['POST', '/api/incidents', ({ body }) => ({ status: 201, data: engine().createIncident(body) })],
+    ['PATCH', '/api/incidents/:id/actions/:key', ({ params, body }) => ({ data: engine().updateIncidentAction(params.id, params.key, body?.done) })],
+    ['PATCH', '/api/incidents/:id/resolve', ({ params }) => ({ data: engine().resolveIncident(params.id) })],
     ['POST', '/api/reset', () => { db = seedDb(); store.save(db); return { data: { ok: true } }; }],
   ].map(([method, pattern, handler]) => ({
     method, handler,

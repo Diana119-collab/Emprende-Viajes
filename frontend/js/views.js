@@ -1,8 +1,11 @@
 import { api } from './api.js';
-import { STATUSES, STATUS_LABEL, NEXT_ACTION, COMMISSION_RATE, DESTINATIONS, TICKET_CATEGORIES, HttpError, validateSale, computeSaleMoney, daysBetween } from './core.js';
+import {
+  STATUSES, STATUS_LABEL, NEXT_ACTION, COMMISSION_RATE, DESTINATIONS, TICKET_CATEGORIES, HttpError, validateSale, computeSaleMoney, daysBetween,
+  DOC_ITEMS, REQUIREMENT_ITEMS, COMPONENT_TYPES, INCIDENT_ACTIONS,
+} from './core.js';
 import {
   $, $$, esc, money, fmtDate, monthNameCap, avatar, statusBadge, commBadge, icon, toast, openModal, closeModal,
-  countUp, confetti, debounce, ring, barChart, fieldErr, downloadCSV,
+  countUp, confetti, debounce, ring, barChart, fieldErr, downloadCSV, travelLevelBadge, dotStatus, reqBadge,
 } from './ui.js';
 
 /* ------------------------------------------------------------------ */
@@ -36,7 +39,7 @@ export async function openSaleDrawer(id) {
     <div class="drawer-head">
       <p class="eyebrow">Venta ${esc(s.id)}</p>
       <h2>${esc(s.destination)}${s.country ? `, ${esc(s.country)}` : ''}</h2>
-      ${statusBadge(s.status)}
+      ${statusBadge(s.status)}${s.international ? travelLevelBadge(s.travelLevel) : ''}
     </div>
     <div class="person">${avatar(s.client.name, 48)}<div><strong>${esc(s.client.name)}</strong>
       <div class="contact">${s.client.phone ? `<a href="tel:${esc(s.client.phone.replace(/\s/g, ''))}">${icon.phone}${esc(s.client.phone)}</a>` : ''}
@@ -61,6 +64,7 @@ export async function openSaleDrawer(id) {
       <div class="hl"><span>Tu comisión (${Math.round(COMMISSION_RATE * 100)}%)</span><strong>${money(s.commission)}</strong> ${commBadge(s.commissionStatus)}</div>
     </div>
     ${s.notes ? `<div class="note"><strong>Notas</strong><p>${esc(s.notes)}</p></div>` : ''}
+    ${s.international ? intlBlock(s) : ''}
     ${next ? `<button class="btn ghost block" data-advance="${esc(s.id)}" data-next="${next}">Simular avance a “${esc(STATUS_LABEL[next])}” ${icon.arrow}</button>
       <p class="hint">Solo demo: en la operación real, el back office actualiza el estado por ti.</p>` : `<p class="hint ok">${icon.check} Venta finalizada. ¡Buen trabajo!</p>`}`;
   openModal(html, {
@@ -77,6 +81,124 @@ export async function openSaleDrawer(id) {
           shared.refresh();
         } catch (e) { toast(e.message, 'err'); b.disabled = false; }
       };
+      if (s.international) bindIntlBlock(root, s);
+    },
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Módulos de viaje internacional (dentro del detalle de venta)       */
+/* ------------------------------------------------------------------ */
+const COMPONENT_ICON = { vuelo: icon.plane, hotel: icon.home, traslado: icon.route, actividad: icon.award, seguro: icon.lock };
+
+function intlBlock(s) {
+  const missing = s.checklist.filter((c) => !c.ok);
+  return `
+    <section class="intl-block">
+      <div class="intl-head"><h3>${icon.globe} Ficha de viaje internacional</h3>${travelLevelBadge(s.travelLevel)}</div>
+      <p class="hint">${missing.length ? `Faltan ${missing.length} de ${s.checklist.length} ítems.` : 'Checklist completo.'}</p>
+      <ul class="doc-list">${s.checklist.map((c) => `<li><label class="check"><input type="checkbox" data-doc="${c.key}" ${c.ok ? 'checked' : ''}><span class="box">${icon.check}</span><span class="lt">${esc(c.label)}</span></label></li>`).join('')}</ul>
+
+      <h3 class="mini-title">${icon.route} Itinerario</h3>
+      ${s.components.length ? `<ol class="itin-list">${s.components.map((it) => `<li><span class="itin-ico">${COMPONENT_ICON[it.type] || icon.route}</span>
+        <div class="itin-main"><strong>${esc(it.time)} · ${esc(it.title)}</strong>${it.notes ? `<small>${esc(it.notes)}</small>` : ''}</div>
+        <button type="button" class="icon-btn tiny" data-rm-itin="${esc(it.id)}" aria-label="Quitar">${icon.x}</button></li>`).join('')}</ol>`
+        : '<p class="hint">Aún no agregaste vuelos, hotel, traslados ni actividades.</p>'}
+      <form id="itin-form" class="itin-form">
+        <select name="type" aria-label="Tipo">${COMPONENT_TYPES.map((t) => `<option value="${t.key}">${t.label}</option>`).join('')}</select>
+        <input type="time" name="time" value="09:00" aria-label="Hora">
+        <input type="text" name="title" placeholder="Ej. Vuelo Lima → Madrid" aria-label="Título">
+        <button type="submit" class="btn ghost tiny">${icon.plus} Agregar</button>
+      </form>
+
+      <div class="intl-actions">
+        <button type="button" class="btn ghost" data-client-view>${icon.plane} Vista del cliente</button>
+        <button type="button" class="btn ghost" data-open-req>${icon.lock} Requisitos migratorios</button>
+      </div>
+    </section>`;
+}
+
+function bindIntlBlock(root, s) {
+  $$('[data-doc]', root).forEach((cb) => {
+    cb.onchange = async () => {
+      cb.disabled = true;
+      try { await api.updateSaleDocs(s.id, { [cb.dataset.doc]: cb.checked }); shared.refresh(); closeModal(true); await openSaleDrawer(s.id); }
+      catch (e) { toast(e.message, 'err'); cb.checked = !cb.checked; cb.disabled = false; }
+    };
+  });
+  $$('[data-rm-itin]', root).forEach((b) => {
+    b.onclick = async () => {
+      try { await api.removeItineraryItem(s.id, b.dataset.rmItin); closeModal(true); await openSaleDrawer(s.id); }
+      catch (e) { toast(e.message, 'err'); }
+    };
+  });
+  const form = $('#itin-form', root);
+  if (form) form.onsubmit = async (ev) => {
+    ev.preventDefault();
+    try {
+      await api.addItineraryItem(s.id, { type: form.type.value, time: form.time.value, title: form.title.value });
+      closeModal(true); await openSaleDrawer(s.id);
+    } catch (e) { toast(e instanceof HttpError && e.details ? Object.values(e.details)[0] : e.message, 'err'); }
+  };
+  const cv = $('[data-client-view]', root);
+  if (cv) cv.onclick = () => { closeModal(true); openClientView(s.id); };
+  const rq = $('[data-open-req]', root);
+  if (rq) rq.onclick = () => { closeModal(true); openRequirementsModal(s.id); };
+}
+
+/* ------------------------------------------------------------------ */
+/* Módulo 5: Cliente preparado para viajar (vista de solo lectura)    */
+/* ------------------------------------------------------------------ */
+export async function openClientView(id) {
+  let s;
+  try { s = await api.sale(id); } catch (e) { toast(e.message, 'err'); return; }
+  const left = daysBetween(shared.meta.today, s.travelDate);
+  const doneCount = s.checklist.filter((c) => c.ok).length;
+  openModal(`
+    <div class="drawer-head"><p class="eyebrow">Vista del cliente</p><h2>${esc(s.client.name.split(' ')[0])}, tu viaje a ${esc(s.destination)} ${left >= 0 ? 'está en camino' : 'ya comenzó'}</h2></div>
+    <p class="sub">${left > 0 ? `Faltan ${left} día${left === 1 ? '' : 's'}.` : left === 0 ? 'Hoy es el día del viaje.' : 'Buen viaje.'} ${doneCount}/${s.checklist.length} listo.</p>
+    <ul class="checks client-checks">${s.checklist.map((c) => dotStatus(c.ok, c.label)).join('')}</ul>
+    <div class="cv-tips">
+      <div class="cv-tip"><h3>Antes de viajar</h3><p>Ten a mano tu pasaporte, la reserva y confirma el check-in online 24 horas antes.</p></div>
+      <div class="cv-tip"><h3>Al llegar</h3><p>${s.components.find((c) => c.type === 'traslado') ? `Tu traslado te recoge a las ${esc(s.components.find((c) => c.type === 'traslado').time)}.` : 'Coordina tu traslado con la agencia antes de salir.'}</p></div>
+      <div class="cv-tip"><h3>Durante el viaje</h3><p>Cualquier imprevisto, escríbenos: estamos para resolverlo por ti.</p></div>
+    </div>
+    ${s.components.length ? `<h3 class="mini-title">Tu itinerario</h3><ol class="itin-list">${s.components.map((it) => `<li><span class="itin-ico">${COMPONENT_ICON[it.type] || icon.route}</span><div class="itin-main"><strong>${esc(it.time)} · ${esc(it.title)}</strong>${it.notes ? `<small>${esc(it.notes)}</small>` : ''}</div></li>`).join('')}</ol>` : ''}
+    <div class="person"><span class="avatar" style="--s:40px;background:#f28c28" aria-hidden="true">${esc((shared.meta.agent.name || '?')[0])}</span>
+      <div><strong>${esc(shared.meta.agent.name)}</strong><small>Tu agente · ${esc(shared.meta.agent.role)}</small></div></div>
+    <p class="hint">Así es como lo ve tu cliente: tú vendes, nosotros operamos y tu cliente lo siente.</p>`,
+  { label: `Vista del cliente ${s.id}` });
+}
+
+/* ------------------------------------------------------------------ */
+/* Módulo 3: Travel Requirements (semáforo migratorio)                */
+/* ------------------------------------------------------------------ */
+export async function openRequirementsModal(id) {
+  const r = await api.requirements(id);
+  const draw = (data) => `
+    <div class="drawer-head"><p class="eyebrow">Requisitos · ${esc(data.saleId)}</p><h2>${esc(data.destination)}${data.country ? `, ${esc(data.country)}` : ''}</h2></div>
+    <div class="note"><strong>${icon.lock} Principio</strong><p>El dato siempre viene de una fuente oficial, con fecha de verificación. La IA organiza y explica; nunca reemplaza la verificación humana.</p></div>
+    <ul class="req-list">${data.items.map((it) => `<li class="req-row">
+      <div class="req-main"><strong>${esc(it.label)}</strong>${it.source ? `<small>${esc(it.source)}${it.checkedAt ? ` · ${esc(fmtDate(it.checkedAt))}` : ''}</small>` : ''}</div>
+      ${reqBadge(it.status)}
+      <select data-req="${it.key}" aria-label="Estado de ${esc(it.label)}">
+        <option value="pendiente" ${it.status === 'pendiente' ? 'selected' : ''}>Falta verificar</option>
+        <option value="verificado" ${it.status === 'verificado' ? 'selected' : ''}>Verificado</option>
+        <option value="no_aplica" ${it.status === 'no_aplica' ? 'selected' : ''}>No aplica</option>
+      </select></li>`).join('')}</ul>`;
+  openModal(draw(r), {
+    label: `Requisitos de viaje ${r.saleId}`,
+    onMount: (root) => {
+      $$('[data-req]', root).forEach((sel) => {
+        sel.onchange = async () => {
+          const source = sel.value === 'pendiente' ? '' : prompt('¿De qué fuente oficial lo verificaste? (ej. embajada, migraciones)') || '';
+          try {
+            const updated = await api.updateRequirement(id, sel.dataset.req, { status: sel.value, source });
+            root.innerHTML = draw(updated);
+            $$('[data-req]', root).forEach((s2) => { s2.onchange = sel.onchange; });
+          } catch (e) { toast(e.message, 'err'); }
+        };
+      });
     },
   });
 }
@@ -391,6 +513,117 @@ export async function operaciones(root) {
   $('#q', root).oninput = debounce((e) => { opsState.q = e.target.value; load(); }, 200);
   shared.refresh = load;
   await load();
+}
+
+/* ------------------------------------------------------------------ */
+/* Módulo 2: International Travel Control                             */
+/* ------------------------------------------------------------------ */
+export async function travelControl(root) {
+  root.innerHTML = `${pageHead('International Travel Control', 'En vez de revisar cada venta manualmente, el sistema te dice qué falta y por qué.')}<div id="tc-body"></div>`;
+  const load = async () => {
+    const d = await api.travelControl();
+    const row = (s) => `<li><button class="list-row tc-row" data-sale="${esc(s.id)}">
+      ${avatar(s.client.name, 38)}<span class="lr-main"><strong>${esc(s.destination)}${s.country ? `, ${esc(s.country)}` : ''}</strong>
+      <small>${esc(s.client.name)} · Sale ${s.daysLeft != null ? relDays(s.daysLeft) : '—'}</small>
+      <small class="tc-missing">${s.missing.map((m) => esc(m)).join(' · ')}</small></span>${travelLevelBadge(s.level)}</button></li>`;
+    $('#tc-body', root).innerHTML = `
+      <div class="kpis three">
+        <div class="kpi ic tc-crit"><span class="qi tc-ic-bad">${icon.warning}</span><div><span>Críticos</span><strong>${d.counts.critical}</strong></div></div>
+        <div class="kpi ic tc-pend"><span class="qi tc-ic-warn">${icon.warning}</span><div><span>Pendientes</span><strong>${d.counts.pending}</strong></div></div>
+        <div class="kpi ic tc-ok"><span class="qi tc-ic-ok">${icon.check}</span><div><span>En orden</span><strong>${d.counts.ok}</strong></div></div>
+      </div>
+      ${d.critical.length ? `<section class="card"><h2>${icon.warning} Críticos — salen pronto y les falta algo</h2><ul class="list">${d.critical.map(row).join('')}</ul></section>` : ''}
+      ${d.pending.length ? `<section class="card"><h2>Pendientes</h2><ul class="list">${d.pending.map(row).join('')}</ul></section>` : ''}
+      ${!d.critical.length && !d.pending.length ? `<section class="card">${empty('Todo en orden', 'No hay viajes internacionales con documentación pendiente en este momento.')}</section>` : ''}`;
+  };
+  shared.refresh = load;
+  await load();
+}
+
+/* ------------------------------------------------------------------ */
+/* Módulo 3: Travel Requirements — lista de viajes internacionales    */
+/* ------------------------------------------------------------------ */
+export async function requisitos(root) {
+  root.innerHTML = `${pageHead('Travel Requirements', 'Semáforo migratorio: lo verifica el agente contra fuentes oficiales, la IA solo organiza y explica.')}<div id="req-body"></div>`;
+  const load = async () => {
+    const { items } = await api.sales({ status: 'todas' });
+    const intl = items.filter((s) => s.international && s.status !== 'finalizada');
+    $('#req-body', root).innerHTML = intl.length ? `<div class="cards-grid">${intl.map((s) => `<button class="client-card" data-req-sale="${esc(s.id)}">
+      <div class="cc-top">${avatar(s.client.name, 46)}<div><strong>${esc(s.destination)}, ${esc(s.country)}</strong><small>${esc(s.client.name)}</small></div></div>
+      <small class="cc-last">Viaja ${esc(fmtDate(s.travelDate))}</small>
+      <div class="req-mini">${travelLevelBadge(s.travelLevel)}</div></button>`).join('')}</div>`
+      : empty('Sin viajes internacionales activos', 'Cuando registres una venta a otro país, aparecerá aquí.');
+    $$('[data-req-sale]', root).forEach((b) => { b.onclick = () => openRequirementsModal(b.dataset.reqSale); });
+  };
+  shared.refresh = load;
+  await load();
+}
+
+/* ------------------------------------------------------------------ */
+/* Módulo 6: Centro de incidencias internacionales                    */
+/* ------------------------------------------------------------------ */
+export async function incidencias(root) {
+  root.innerHTML = `${pageHead('Centro de incidencias internacionales', 'Tú vendes. Nosotros operamos: aquí resolvemos lo que cambia a último momento.', `<button class="btn primary" id="new-inc">${icon.plus} Nueva incidencia</button>`)}<div id="inc-body"></div>`;
+  const load = async () => {
+    const { items } = await api.incidents();
+    $('#inc-body', root).innerHTML = items.length ? items.map((inc) => `
+      <section class="card incident ${inc.status === 'resuelta' ? 'resolved' : ''}">
+        <div class="card-head"><div><h2>${esc(inc.id)} — ${esc(inc.sale?.destination || '—')}</h2>
+          <p class="sub">${esc(inc.sale?.client.name || '')} · ${esc(inc.problem)}</p></div>
+          <span class="badge ${inc.status === 'resuelta' ? 'lvl-ok' : 'lvl-bad'}">${inc.status === 'resuelta' ? 'Resuelta' : 'Abierta'}</span></div>
+        ${inc.originalTime || inc.newTime || inc.transferTime ? `<div class="inc-times">
+          ${inc.originalTime ? `<div><span>Hora original</span><strong>${esc(inc.originalTime)}</strong></div>` : ''}
+          ${inc.newTime ? `<div><span>Nueva hora</span><strong>${esc(inc.newTime)}</strong></div>` : ''}
+          ${inc.transferTime ? `<div><span>Traslado reservado</span><strong>${esc(inc.transferTime)}</strong></div>` : ''}
+        </div>` : ''}
+        ${inc.conflict ? `<div class="note bad"><strong>${icon.warning} Posible conflicto</strong><p>El cliente podría perder el traslado ya reservado.</p></div>` : ''}
+        ${inc.notes ? `<p class="hint">${esc(inc.notes)}</p>` : ''}
+        <ul class="inc-actions">${INCIDENT_ACTIONS.map((a) => `<li><label class="check"><input type="checkbox" data-inc-action="${a.key}" data-inc="${esc(inc.id)}" ${inc.actions[a.key] ? 'checked' : ''}><span class="box">${icon.check}</span><span class="lt">${esc(a.label)}</span></label></li>`).join('')}</ul>
+        ${inc.sale ? `<button class="btn ghost tiny" data-sale="${esc(inc.sale.id)}">Ver venta ${icon.arrow}</button>` : ''}
+      </section>`).join('')
+      : `<section class="card">${empty('Sin incidencias', 'Cuando algo cambie a último momento, regístralo aquí.')}</section>`;
+    $$('[data-inc-action]', root).forEach((cb) => {
+      cb.onchange = async () => {
+        cb.disabled = true;
+        try { await api.setIncidentAction(cb.dataset.inc, cb.dataset.incAction, cb.checked); await load(); }
+        catch (e) { toast(e.message, 'err'); cb.checked = !cb.checked; cb.disabled = false; }
+      };
+    });
+  };
+  $('#new-inc', root).onclick = () => openIncidentForm(load);
+  shared.refresh = load;
+  await load();
+}
+
+function openIncidentForm(onDone) {
+  openModal(`<h2>Registrar incidencia</h2><p class="sub">Cuéntanos qué cambió y con qué venta está relacionado.</p>
+    <form id="if" class="form" novalidate>
+      <label class="field"><span>Venta</span><select name="saleId" id="if-sale"></select><span class="err" data-e="saleId"></span></label>
+      <label class="field"><span>¿Qué pasó?</span><input name="problem" placeholder="Ej. Vuelo retrasado por la aerolínea" autocomplete="off"><span class="err" data-e="problem"></span></label>
+      <div class="row3">
+        <label class="field"><span>Hora original</span><input name="originalTime" type="time"></label>
+        <label class="field"><span>Nueva hora</span><input name="newTime" type="time"></label>
+        <label class="field"><span>Traslado reservado</span><input name="transferTime" type="time"></label>
+      </div>
+      <label class="field"><span>Notas <em>(opcional)</em></span><textarea name="notes" rows="3" maxlength="300"></textarea></label>
+      <button class="btn primary block" type="submit">Registrar incidencia</button></form>`, {
+    label: 'Registrar incidencia',
+    onMount: async (r) => {
+      const sel = $('#if-sale', r);
+      const { items } = await api.sales({ status: 'todas' });
+      const active = items.filter((s) => s.status !== 'finalizada');
+      sel.innerHTML = active.map((s) => `<option value="${esc(s.id)}">${esc(s.id)} · ${esc(s.client.name)} · ${esc(s.destination)}</option>`).join('');
+      const f = $('#if', r);
+      f.onsubmit = async (ev) => {
+        ev.preventDefault();
+        $$('[data-e]', f).forEach((x) => { x.textContent = ''; });
+        try {
+          await api.createIncident({ saleId: f.saleId.value, problem: f.problem.value, originalTime: f.originalTime.value, newTime: f.newTime.value, transferTime: f.transferTime.value, notes: f.notes.value });
+          toast('Incidencia registrada'); closeModal(); onDone();
+        } catch (e) { if (e.details) Object.entries(e.details).forEach(([k, v]) => { const el = $(`[data-e=${k}]`, f); if (el) el.textContent = v; }); else toast(e.message, 'err'); }
+      };
+    },
+  });
 }
 
 /* ------------------------------------------------------------------ */
