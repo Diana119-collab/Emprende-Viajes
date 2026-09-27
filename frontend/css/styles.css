@@ -33,6 +33,7 @@ button { cursor: pointer; }
 .app { display: grid; grid-template-columns: var(--side) minmax(0, 1fr); min-height: 100vh; }
 .sidebar { position: sticky; top: 0; height: 100vh; background: var(--navy); color: #dbe7f4; display: flex; flex-direction: column; padding: 22px 14px 16px; gap: 22px; z-index: 40; overflow-y: auto; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #fff; padding: 0 8px; }
+.brand-mark { object-fit: contain; flex-shrink: 0; }
 .brand span { display: flex; flex-direction: column; line-height: 1.05; }
 .brand strong { font-size: 1.15rem; letter-spacing: .01em; } .brand em { font-style: normal; color: var(--teal); font-weight: 700; font-size: 1.15rem; }
 .nav { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
@@ -40,6 +41,13 @@ button { cursor: pointer; }
 .nav a:hover { background: rgba(255, 255, 255, .08); color: #fff; transform: translateX(2px); }
 .nav a.on { background: #fff; color: var(--navy); font-weight: 700; }
 .nav a.on .ico { color: var(--teal-ink); }
+.nav-group summary { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 12px; color: #c4d4e6; font-weight: 500; cursor: pointer; list-style: none; user-select: none; transition: background .15s, color .15s; }
+.nav-group summary::-webkit-details-marker, .nav-group summary::marker { display: none; content: ''; }
+.nav-group summary:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+.nav-group summary .ico:last-child { margin-left: auto; width: 16px; height: 16px; transition: transform .15s; }
+.nav-group details[open] > summary .ico:last-child { transform: rotate(180deg); }
+.nav-sub { list-style: none; margin: 4px 0 0 20px; padding: 0 0 0 12px; display: grid; gap: 4px; border-left: 1px solid rgba(255, 255, 255, .14); }
+.nav-sub a { padding: 9px 12px; font-size: .94rem; }
 :root[data-theme="dark"] .nav a.on { background: var(--teal); color: #04202a; }
 :root[data-theme="dark"] .nav a.on .ico { color: #04202a; }
 .side-foot { margin-top: auto; display: grid; gap: 8px; }

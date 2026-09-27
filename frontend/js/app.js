@@ -8,12 +8,27 @@ const ROUTES = {
   operaciones: { title: 'Operaciones', icon: 'ops', view: V.operaciones },
   control: { title: 'Control de viajes', icon: 'warning', view: V.travelControl },
   incidencias: { title: 'Incidencias', icon: 'wrench', view: V.incidencias },
-  requisitos: { title: 'Travel Requirements', icon: 'globe', view: V.requisitos },
+  requisitos: { title: 'Requisitos de viaje', icon: 'globe', view: V.requisitos },
   clientes: { title: 'Clientes', icon: 'users', view: V.clientes },
   comisiones: { title: 'Comisiones', icon: 'coin', view: V.comisiones },
   capacitacion: { title: 'Capacitación', icon: 'book', view: V.capacitacion },
   soporte: { title: 'Soporte', icon: 'help', view: V.soporte },
 };
+
+/* Estructura visual del menú: agrupa Operaciones y Control de viajes
+   como submenú dentro de "Back office". Cada entrada es una key de
+   ROUTES, o un grupo { title, icon, children: [keys] }. */
+const NAV = [
+  'inicio',
+  'venta',
+  { title: 'Back office', icon: 'ops', children: ['operaciones', 'control'] },
+  'incidencias',
+  'requisitos',
+  'clientes',
+  'comisiones',
+  'capacitacion',
+  'soporte',
+];
 
 const main = () => $('#view');
 let renderToken = 0;
@@ -30,7 +45,7 @@ async function render() {
   $$('.nav a').forEach((a) => {
     const on = a.dataset.route === key;
     a.classList.toggle('on', on);
-    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    if (on) { a.setAttribute('aria-current', 'page'); a.closest('details')?.setAttribute('open', ''); } else a.removeAttribute('aria-current');
   });
   document.title = `${r.title} · Emprende Viajes`;
   closeNav();
@@ -67,7 +82,10 @@ async function boot() {
   V.shared.meta = await api.meta();
   const { agent } = V.shared.meta;
 
-  $('#nav').innerHTML = Object.entries(ROUTES).map(([k, r]) => `<li><a href="#/${k}" data-route="${k}">${icon[r.icon]}<span>${r.title}</span></a></li>`).join('');
+  const navLink = (k) => { const r = ROUTES[k]; return `<li><a href="#/${k}" data-route="${k}">${icon[r.icon]}<span>${r.title}</span></a></li>`; };
+  $('#nav').innerHTML = NAV.map((item) => (typeof item === 'string' ? navLink(item)
+    : `<li class="nav-group"><details><summary>${icon[item.icon]}<span>${item.title}</span>${icon.chevron}</summary>
+        <ul class="nav-sub">${item.children.map(navLink).join('')}</ul></details></li>`)).join('');
   $('#agent').innerHTML = `<span class="avatar" style="--s:40px;background:#f28c28" aria-hidden="true">${esc(agent.name[0])}</span><div><strong>${esc(agent.name)}</strong><small>${esc(agent.role)}</small></div>`;
   $('#mode-badge').innerHTML = mode === 'remote' ? '<i class="dot-on"></i> Conectado al servidor' : '<i class="dot-demo"></i> Modo demo (datos en tu navegador)';
 

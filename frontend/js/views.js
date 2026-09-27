@@ -206,7 +206,6 @@ export async function openRequirementsModal(id, { onBack } = {}) {
   const r = await api.requirements(id);
   const draw = (data) => `
     <div class="drawer-head"><p class="eyebrow">Requisitos · ${esc(data.saleId)}</p><h2>${esc(data.destination)}${data.country ? `, ${esc(data.country)}` : ''}</h2></div>
-    <div class="note"><strong>${icon.lock} Principio</strong><p>El dato siempre viene de una fuente oficial, con fecha de verificación. La IA organiza y explica; nunca reemplaza la verificación humana.</p></div>
     <ul class="req-list">${data.items.map((it) => `<li class="req-row">
       <div class="req-main"><strong>${esc(it.label)}</strong>${it.source ? `<small>${esc(it.source)}${it.checkedAt ? ` · ${esc(fmtDate(it.checkedAt))}` : ''}</small>` : ''}</div>
       ${reqBadge(it.status)}
@@ -575,7 +574,7 @@ export async function travelControl(root) {
 /* Módulo 3: Travel Requirements — lista de viajes internacionales    */
 /* ------------------------------------------------------------------ */
 export async function requisitos(root) {
-  root.innerHTML = `${pageHead('Travel Requirements', 'Semáforo migratorio: lo verifica el agente contra fuentes oficiales, la IA solo organiza y explica.')}<div id="req-body"></div>`;
+  root.innerHTML = `${pageHead('Requisitos de viaje', 'Semáforo migratorio: lo verifica el agente contra fuentes oficiales, la IA solo organiza y explica.')}<div id="req-body"></div>`;
   const load = async () => {
     const { items } = await api.sales({ status: 'todas' });
     const intl = items.filter((s) => s.international && s.status !== 'finalizada');
