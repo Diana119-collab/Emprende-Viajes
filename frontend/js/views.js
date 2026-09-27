@@ -220,9 +220,8 @@ export async function openRequirementsModal(id, { onBack } = {}) {
     onMount: (root) => {
       $$('[data-req]', root).forEach((sel) => {
         sel.onchange = async () => {
-          const source = sel.value === 'pendiente' ? '' : prompt('¿De qué fuente oficial lo verificaste? (ej. embajada, migraciones)') || '';
           try {
-            const updated = await api.updateRequirement(id, sel.dataset.req, { status: sel.value, source });
+            const updated = await api.updateRequirement(id, sel.dataset.req, { status: sel.value });
             root.innerHTML = draw(updated);
             $$('[data-req]', root).forEach((s2) => { s2.onchange = sel.onchange; });
           } catch (e) { toast(e.message, 'err'); }
@@ -290,7 +289,7 @@ export function openQuote() {
 let dashMonth = null;
 export async function inicio(root) {
   dashMonth = dashMonth || shared.meta.today.slice(0, 7);
-  const [d, tc] = await Promise.all([api.dashboard(dashMonth), api.travelControl()]);
+  const d = await api.dashboard(dashMonth);
   const delta = (v) => (v == null ? '<span class="delta flat">Sin datos del mes anterior</span>'
     : v === 0 ? '<span class="delta flat">= igual que el mes anterior</span>'
     : `<span class="delta ${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '▲' : '▼'} ${v >= 0 ? '+' : ''}${v}% vs. mes anterior</span>`);
@@ -317,20 +316,6 @@ export async function inicio(root) {
     <a class="qa" href="#/clientes"><span class="qi c-purple">${icon.users}</span><strong>Mis clientes</strong><small>Tu cartera</small></a>
     <a class="qa" href="#/comisiones"><span class="qi c-orange">${icon.coin}</span><strong>Mis comisiones</strong><small>Ingresos y estados</small></a>
   </section>
-
-  ${tc.counts.critical || tc.counts.pending ? `
-  <section class="card">
-    <div class="card-head"><h2>${icon.warning} Control de viajes</h2><a class="link" href="#/control">Ver todo ${icon.arrow}</a></div>
-    <div class="kpis three mini">
-      <div class="kpi ic tc-crit"><span class="qi tc-ic-bad">${icon.warning}</span><div><span>Críticos</span><strong>${tc.counts.critical}</strong></div></div>
-      <div class="kpi ic tc-pend"><span class="qi tc-ic-warn">${icon.warning}</span><div><span>Pendientes</span><strong>${tc.counts.pending}</strong></div></div>
-      <div class="kpi ic tc-ok"><span class="qi tc-ic-ok">${icon.check}</span><div><span>En orden</span><strong>${tc.counts.ok}</strong></div></div>
-    </div>
-    ${tc.critical.length ? `<ul class="list">${[...tc.critical, ...tc.pending].slice(0, 3).map((s) => `<li class="tc-row-item">
-      <button class="list-row tc-row" data-sale="${esc(s.id)}">${avatar(s.client.name, 36)}<span class="lr-main"><strong>${esc(s.destination)}${s.country ? `, ${esc(s.country)}` : ''}</strong><small>${esc(s.client.name)} · Sale ${relDays(s.daysLeft)}</small></span>${travelLevelBadge(s.level)}</button>
-      <button type="button" class="btn ghost tiny tc-remind" data-remind="${esc(s.id)}" title="Enviar recordatorio al cliente">${icon.bell}</button></li>`).join('')}</ul>`
-      : '<p class="hint">No hay viajes internacionales críticos en este momento; revisa los pendientes en Control de viajes.</p>'}
-  </section>` : ''}
 
   <div class="grid-main">
     <section class="card">
@@ -379,7 +364,6 @@ export async function inicio(root) {
   $$('[data-count]', root).forEach((el) => countUp(el, +el.dataset.count, el.dataset.f === 'money' ? money : (v) => String(Math.round(v))));
   $('#dash-month', root).onchange = (e) => { dashMonth = e.target.value; inicio(root); };
   $('[data-qa=quote]', root).onclick = openQuote;
-  $$('[data-remind]', root).forEach((b) => { b.onclick = () => quickRemind(b.dataset.remind); });
   shared.refresh = () => inicio(root);
 }
 
@@ -837,10 +821,10 @@ const openCourses = new Set(['K-2']);
 export async function capacitacion(root) {
   const t = await api.training();
   const o = t.overall;
-  root.innerHTML = `${pageHead('Capacitación y certificación', 'Aprende a vender turismo con criterio, a tu ritmo.')}
+  root.innerHTML = `${pageHead('Capacitación y constancia', 'Aprende a vender turismo con criterio, a tu ritmo.')}
     <section class="card cert ${o.certified ? 'ok' : ''}"><div class="cert-ring">${ring(o.percent, 110)}</div>
-      <div class="cert-text"><h2>${icon.award} Certificación en Venta de Turismo</h2>
-        <p>${o.certified ? '¡Felicidades! Completaste todo el programa y estás certificada para vender con respaldo.' : `Has completado <strong>${o.completed} de ${o.total}</strong> lecciones. Completa el 100% para obtener tu certificación.`}</p>
+      <div class="cert-text"><h2>${icon.award} Constancia en Venta de Turismo</h2>
+        <p>${o.certified ? '¡Felicidades! Completaste todo el programa y estás lista para vender con respaldo.' : `Has completado <strong>${o.completed} de ${o.total}</strong> lecciones. Completa el 100% para obtener tu constancia.`}</p>
         ${t.next ? `<p class="hint">Siguiente: <strong>${esc(t.next.lesson.title)}</strong> · ${esc(t.next.course)}</p>` : ''}</div></section>
     <div class="courses">${t.courses.map((c) => `<details class="card course" data-course="${esc(c.id)}" ${openCourses.has(c.id) ? 'open' : ''}>
       <summary><div class="cs-main"><h3>${esc(c.title)}</h3><p>${esc(c.description)}</p>
@@ -852,7 +836,7 @@ export async function capacitacion(root) {
     cb.onchange = async () => {
       try {
         const after = await api.toggleLesson(cb.dataset.lesson);
-        if (after.overall.certified && !o.certified) { confetti(); toast('¡Obtuviste tu certificación!'); }
+        if (after.overall.certified && !o.certified) { confetti(); toast('¡Obtuviste tu constancia!'); }
         capacitacion(root);
       } catch (e) { toast(e.message, 'err'); cb.checked = !cb.checked; }
     };

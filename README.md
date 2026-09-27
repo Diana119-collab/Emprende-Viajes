@@ -12,7 +12,7 @@ MVP basado en el pitch de Opera Ligero (Startup Weekend): el agente registra ven
 | **Operaciones** | Seguimiento por estado (En proceso / Confirmada / En viaje / Finalizada), búsqueda y detalle con línea de tiempo |
 | **Clientes** | Cartera con historial de compras; alta y edición de clientes; "nueva venta" desde la ficha; **perfil de viajero** (qué tipo de destino prefiere y en qué categoría de hotel suele reservar, según su historial) con paquetes sugeridos del catálogo, enviables por WhatsApp o correo (demo) |
 | **Comisiones** | Comisión generada / en proceso / pagada, en vista **mensual o anual** (selector Mensual/Anual); exportación a CSV o a **Excel con formato y gráficos** (hoja de detalle + resumen mensual/anual con su gráfico de barras incrustado). Montos en dólares (US$) |
-| **Capacitación** | 5 cursos con lecciones marcables y certificación al llegar al 100 % |
+| **Capacitación** | 5 cursos con lecciones marcables y constancia al llegar al 100 % |
 | **Soporte** | Preguntas frecuentes y solicitudes al back office |
 | Extras | Cotizador rápido, modo oscuro, diseño responsive, accesible por teclado |
 
@@ -21,7 +21,7 @@ MVP basado en el pitch de Opera Ligero (Startup Weekend): el agente registra ven
 | Módulo | Qué hace |
 |---|---|
 | **Ficha "Viaje internacional"** | Al detectar que el destino no es Perú, arma un checklist (pasaporte, vuelo, hotel, seguro, traslado, documento de entrada) dentro del detalle de la venta; el agente lo va marcando |
-| **Control de viajes** (International Travel Control) | Agrupa todas las ventas internacionales activas en Críticas / Pendientes / Al día, explicando qué falta en cada una y por qué, para no revisarlas una por una. Un resumen con lo crítico aparece también en **Inicio**, apenas entra el agente, y cada venta muestra el motivo ("Crítico: sale en 2 días y falta el seguro de viaje") al abrir su detalle |
+| **Control de viajes** (International Travel Control) | Agrupa todas las ventas internacionales activas en Críticas / Pendientes / Al día, explicando qué falta en cada una y por qué, para no revisarlas una por una; cada venta muestra el motivo ("Crítico: sale en 2 días y falta el seguro de viaje") al abrir su detalle. (El resumen de este módulo se quitó por ahora de la pantalla de Inicio; se accede desde el menú lateral) |
 | **Travel Requirements** | Semáforo migratorio por venta (pasaporte, visa, sanidad, documentos, seguro, restricciones); el agente lo verifica contra la fuente oficial y anota fuente + fecha — la app organiza, nunca inventa el requisito |
 | **Itinerario inteligente** | El agente arma vuelo, hotel, traslados y actividades por hora; se ordena solo y se muestra en una versión lista para el cliente |
 | **Cliente preparado para viajar** | Vista de solo lectura pensada para compartir con el cliente: días para el viaje, checklist, consejos antes/al llegar/durante y contacto de la agencia |
