@@ -11,7 +11,7 @@ MVP basado en el pitch de Opera Ligero (Startup Weekend): el agente registra ven
 | **Registrar venta** | Asistente de 4 pasos (Cliente → Viaje → Detalles → Confirmación) con validación, autocompletado de clientes existentes y cálculo de comisión en vivo |
 | **Operaciones** | Seguimiento por estado (En proceso / Confirmada / En viaje / Finalizada), búsqueda y detalle con línea de tiempo |
 | **Clientes** | Cartera con historial de compras; alta y edición de clientes; "nueva venta" desde la ficha; **perfil de viajero** (qué tipo de destino prefiere y en qué categoría de hotel suele reservar, según su historial) con paquetes sugeridos del catálogo, enviables por WhatsApp o correo (demo) |
-| **Comisiones** | Comisión generada / en proceso / pagada, en vista **mensual o anual** (selector Mensual/Anual), gráfico y exportación a CSV. Montos en dólares (US$) |
+| **Comisiones** | Comisión generada / en proceso / pagada, en vista **mensual o anual** (selector Mensual/Anual); exportación a CSV o a **Excel con formato y gráficos** (hoja de detalle + resumen mensual/anual con su gráfico de barras incrustado). Montos en dólares (US$) |
 | **Capacitación** | 5 cursos con lecciones marcables y certificación al llegar al 100 % |
 | **Soporte** | Preguntas frecuentes y solicitudes al back office |
 | Extras | Cotizador rápido, modo oscuro, diseño responsive, accesible por teclado |
@@ -40,7 +40,7 @@ backend/             API REST en Node.js (solo módulos nativos: cero dependenci
   app.js  server.js  store.js  test/api.test.js
 ```
 
-- **Sin dependencias**: no hace falta `npm install`. Requiere Node 18+.
+- **Sin dependencias**: no hace falta `npm install`. Requiere Node 18+. (La única excepción es [ExcelJS](https://github.com/exceljs/exceljs), cargado desde un CDN solo en la página de Comisiones, para poder generar el `.xlsx` con formato y gráficos directamente en el navegador.)
 - El backend sirve también el frontend, así que un solo comando levanta todo.
 - Los datos se guardan en `data/db.json` (suficiente para un piloto).
 

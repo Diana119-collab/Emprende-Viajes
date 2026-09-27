@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { exportCommissionsExcel } from './report.js';
 import {
   STATUSES, STATUS_LABEL, NEXT_ACTION, COMMISSION_RATE, DESTINATIONS, TICKET_CATEGORIES, HttpError, validateSale, computeSaleMoney, daysBetween,
   DOC_ITEMS, REQUIREMENT_ITEMS, COMPONENT_TYPES, INCIDENT_ACTIONS, HOTEL_TIER_LABEL,
@@ -794,7 +795,7 @@ export async function comisiones(root) {
     <button type="button" class="seg-btn ${commView === 'anual' ? 'on' : ''}" data-view="anual">Anual</button>
   </div>`;
   const picker = commView === 'anual' ? yearSelect('cm-year', c.years, c.year) : monthSelect('cm-month', c.month);
-  root.innerHTML = `${pageHead('Mis comisiones', 'Consulta tus ingresos y el detalle de tus comisiones.', `${toggle}${picker}<button class="btn ghost" id="csv" ${c.rows.length ? '' : 'disabled'}>${icon.download} Exportar CSV</button>`)}
+  root.innerHTML = `${pageHead('Mis comisiones', 'Consulta tus ingresos y el detalle de tus comisiones.', `${toggle}${picker}<button class="btn ghost" id="csv" ${c.rows.length ? '' : 'disabled'}>${icon.download} Exportar CSV</button><button class="btn ghost" id="xlsx" ${c.rows.length ? '' : 'disabled'}>${icon.download} Exportar Excel</button>`)}
     <div class="kpis three">
       <div class="kpi ic"><span class="qi c-green">${icon.coin}</span><div><span>Comisión generada</span><strong data-count="${S.generated}" data-f="money">$0</strong></div></div>
       <div class="kpi ic"><span class="qi c-purple">${icon.check}</span><div><span>Ventas cerradas</span><strong data-count="${S.closed}" data-f="int">0</strong></div></div>
@@ -819,6 +820,13 @@ export async function comisiones(root) {
   const csv = $('#csv', root);
   if (csv) csv.onclick = () => downloadCSV(`comisiones-${commView === 'anual' ? c.year : c.month}.csv`, [['Fecha', 'Cliente', 'Destino', 'Monto de venta', 'Utilidad', 'Comisión', 'Estado'],
     ...c.rows.map((r) => [r.saleDate, r.client.name, r.destination, r.amount, r.profit, r.commission, r.commissionStatus === 'pagada' ? 'Pagada' : 'En proceso'])]);
+  const xlsxBtn = $('#xlsx', root);
+  if (xlsxBtn) xlsxBtn.onclick = async () => {
+    xlsxBtn.disabled = true; xlsxBtn.textContent = 'Generando…';
+    try { await exportCommissionsExcel(c, commView); }
+    catch (e) { toast('No se pudo generar el Excel. Intenta de nuevo.', 'err'); }
+    finally { xlsxBtn.disabled = false; xlsxBtn.innerHTML = `${icon.download} Exportar Excel`; }
+  };
   shared.refresh = () => comisiones(root);
 }
 
