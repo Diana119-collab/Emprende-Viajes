@@ -702,6 +702,31 @@ export function createEngine(db, { save = () => {}, now = () => new Date() } = {
       };
     },
 
+    /** Igual que `commissions`, pero agregando el año completo (los 12 meses) en vez de un mes suelto. */
+    annualCommissions(year = Number(today().slice(0, 4))) {
+      const y = String(year);
+      const rows = db.sales.filter((s) => s.saleDate.slice(0, 4) === y).map(withCommission)
+        .sort((a, b) => b.saleDate.localeCompare(a.saleDate));
+      const paid = rows.filter((r) => r.commissionStatus === 'pagada');
+      const pending = rows.filter((r) => r.commissionStatus !== 'pagada');
+      const series = MONTH_SHORT.map((label, i) => {
+        const key = `${y}-${pad(i + 1)}`;
+        const list = db.sales.filter((s) => monthKey(s.saleDate) === key);
+        return { month: key, label, income: sumBy(list, 'amount'), commission: sumBy(list, 'commission'), count: list.length };
+      });
+      const years = [...new Set([...db.sales.map((s) => s.saleDate.slice(0, 4)), today().slice(0, 4)])].sort();
+      return {
+        year: y, rate: COMMISSION_RATE, years,
+        summary: {
+          generated: sumBy(rows, 'commission'), closed: rows.length,
+          paid: sumBy(paid, 'commission'), pending: sumBy(pending, 'commission'),
+          salesAmount: sumBy(rows, 'amount'),
+        },
+        series, rows,
+        allTime: { paid: sumBy(paidOf(db.sales), 'commission'), generated: sumBy(db.sales, 'commission') },
+      };
+    },
+
     training() {
       const done = new Set(db.training.completed);
       const courses = db.training.courses.map((c) => {

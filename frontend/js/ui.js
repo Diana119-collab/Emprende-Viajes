@@ -9,7 +9,7 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
 
 export const money = (n) => {
   const v = Number(n) || 0;
-  return `S/ ${v.toLocaleString('es-PE', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+  return `$${v.toLocaleString('en-US', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 };
 const MONTHS = ['ene.', 'feb.', 'mar.', 'abr.', 'may.', 'jun.', 'jul.', 'ago.', 'sep.', 'oct.', 'nov.', 'dic.'];
 const MONTHS_LONG = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -92,17 +92,21 @@ export function toast(msg, type = 'ok') {
 
 /* ---------- modal / drawer ---------- */
 let lastFocus = null;
-export function openModal(html, { drawer = false, onMount, label = 'Ventana' } = {}) {
+export function openModal(html, { drawer = false, onMount, label = 'Ventana', onBack } = {}) {
   closeModal(true);
   lastFocus = document.activeElement;
   const root = $('#modal-root');
   root.innerHTML = `<div class="backdrop" data-close></div>
     <section class="modal ${drawer ? 'drawer' : ''}" role="dialog" aria-modal="true" aria-label="${esc(label)}">
+      ${onBack ? `<button class="icon-btn modal-back" data-back aria-label="Volver">${icon.back}</button>` : ''}
       <button class="icon-btn modal-x" data-close aria-label="Cerrar">${icon.x}</button>
       <div class="modal-body">${html}</div></section>`;
   document.body.classList.add('modal-open');
   requestAnimationFrame(() => root.classList.add('open'));
-  root.onclick = (e) => { if (e.target.closest('[data-close]')) closeModal(); };
+  root.onclick = (e) => {
+    if (e.target.closest('[data-back]')) { onBack(); return; }
+    if (e.target.closest('[data-close]')) closeModal();
+  };
   const first = $('input:not([type=hidden]), select, textarea, button:not(.modal-x)', $('.modal-body', root));
   (first || $('.modal-x', root)).focus({ preventScroll: true });
   if (onMount) onMount($('.modal-body', root));
@@ -197,6 +201,24 @@ export function barChart(series, selected, key = 'commission') {
 
 export function fieldErr(errors, k) {
   return errors && errors[k] ? `<span class="err" role="alert">${esc(errors[k])}</span>` : '';
+}
+
+/* ---------- envío real (abre WhatsApp / el correo con el mensaje listo) ---------- */
+/** wa.me necesita el número con código de país; asumimos Perú (51) si no trae uno ya. */
+export function waLink(phone, text) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  const withCC = digits.length > 0 && digits.length <= 9 ? `51${digits}` : digits;
+  return `https://wa.me/${withCC}?text=${encodeURIComponent(text)}`;
+}
+export function mailLink(email, subject, text) {
+  return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+}
+/** Abre WhatsApp (pestaña nueva) o el cliente de correo del agente con el mensaje ya escrito, listo para enviar. */
+export function openOutreach(channel, { phone, email, subject, text }) {
+  if (channel === 'email') { if (email) location.href = mailLink(email, subject, text); return !!email; }
+  if (!phone) return false;
+  window.open(waLink(phone, text), '_blank', 'noopener');
+  return true;
 }
 
 export function downloadCSV(name, rows) {

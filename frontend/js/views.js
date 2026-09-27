@@ -5,7 +5,7 @@ import {
 } from './core.js';
 import {
   $, $$, esc, money, fmtDate, monthNameCap, avatar, statusBadge, commBadge, icon, toast, openModal, closeModal,
-  countUp, confetti, debounce, ring, barChart, fieldErr, downloadCSV, travelLevelBadge, dotStatus, reqBadge,
+  countUp, confetti, debounce, ring, barChart, fieldErr, downloadCSV, travelLevelBadge, dotStatus, reqBadge, openOutreach,
 } from './ui.js';
 
 /* ------------------------------------------------------------------ */
@@ -26,16 +26,23 @@ const pageHead = (title, sub, actions = '') => `<header class="page-head"><div><
 const empty = (title, text, cta = '') => `<div class="empty"><div class="empty-ico">${icon.plane}</div><h3>${esc(title)}</h3><p>${esc(text)}</p>${cta}</div>`;
 const relDays = (n) => (n === 0 ? 'hoy' : n > 0 ? `en ${n} día${n === 1 ? '' : 's'}` : `hace ${-n} día${n === -1 ? '' : 's'}`);
 
-/** Envía un recordatorio de demo al cliente (WhatsApp/correo simulado) desde una lista, sin abrir el detalle. */
+/** Texto del mensaje que se le manda al cliente cuando le recordamos lo que falta antes de viajar. */
+const reminderMessage = (s) => `Hola ${s.client.name.split(' ')[0]}, te escribimos de Emprende Viajes sobre tu viaje a ${s.destination}${s.country ? `, ${s.country}` : ''}. ${s.travelReason || 'Cualquier consulta, aquí estamos.'}`;
+
+/** Envía un recordatorio al cliente (queda registrado en la venta) y abre WhatsApp o el correo con el mensaje listo, desde una lista, sin abrir el detalle. */
 async function quickRemind(id) {
-  try { await api.sendReminder(id, { channel: 'whatsapp' }); toast('Recordatorio enviado al cliente (demo).'); }
-  catch (e) { toast(e.message, 'err'); }
+  try {
+    const s = await api.sale(id);
+    await api.sendReminder(id, { channel: 'whatsapp', note: s.travelReason });
+    const opened = openOutreach('whatsapp', { phone: s.client.phone, text: reminderMessage(s) });
+    toast(opened ? 'Recordatorio registrado. Se abrió WhatsApp con el mensaje listo para enviar.' : 'Recordatorio registrado (el cliente no tiene teléfono).');
+  } catch (e) { toast(e.message, 'err'); }
 }
 
 /* ------------------------------------------------------------------ */
 /* Detalle de venta (drawer)                                          */
 /* ------------------------------------------------------------------ */
-export async function openSaleDrawer(id) {
+export async function openSaleDrawer(id, { onBack } = {}) {
   let s;
   try { s = await api.sale(id); } catch (e) { toast(e.message, 'err'); return; }
   const idx = STATUSES.indexOf(s.status);
@@ -77,7 +84,7 @@ export async function openSaleDrawer(id) {
     ${next ? `<button class="btn ghost block" data-advance="${esc(s.id)}" data-next="${next}">Simular avance a “${esc(STATUS_LABEL[next])}” ${icon.arrow}</button>
       <p class="hint">Solo demo: en la operación real, el back office actualiza el estado por ti.</p>` : `<p class="hint ok">${icon.check} Venta finalizada. ¡Buen trabajo!</p>`}`;
   openModal(html, {
-    drawer: true, label: `Detalle de venta ${s.id}`,
+    drawer: true, label: `Detalle de venta ${s.id}`, onBack,
     onMount: (root) => {
       const b = $('[data-advance]', root);
       if (b) b.onclick = async () => {
@@ -86,11 +93,11 @@ export async function openSaleDrawer(id) {
           await api.setStatus(b.dataset.advance, b.dataset.next);
           toast(`Estado actualizado: ${STATUS_LABEL[b.dataset.next]}`);
           closeModal(true);
-          await openSaleDrawer(id);
+          await openSaleDrawer(id, { onBack });
           shared.refresh();
         } catch (e) { toast(e.message, 'err'); b.disabled = false; }
       };
-      if (s.international) bindIntlBlock(root, s);
+      if (s.international) bindIntlBlock(root, s, onBack);
     },
   });
 }
@@ -129,17 +136,17 @@ function intlBlock(s) {
     </section>`;
 }
 
-function bindIntlBlock(root, s) {
+function bindIntlBlock(root, s, onBack) {
   $$('[data-doc]', root).forEach((cb) => {
     cb.onchange = async () => {
       cb.disabled = true;
-      try { await api.updateSaleDocs(s.id, { [cb.dataset.doc]: cb.checked }); shared.refresh(); closeModal(true); await openSaleDrawer(s.id); }
+      try { await api.updateSaleDocs(s.id, { [cb.dataset.doc]: cb.checked }); shared.refresh(); closeModal(true); await openSaleDrawer(s.id, { onBack }); }
       catch (e) { toast(e.message, 'err'); cb.checked = !cb.checked; cb.disabled = false; }
     };
   });
   $$('[data-rm-itin]', root).forEach((b) => {
     b.onclick = async () => {
-      try { await api.removeItineraryItem(s.id, b.dataset.rmItin); closeModal(true); await openSaleDrawer(s.id); }
+      try { await api.removeItineraryItem(s.id, b.dataset.rmItin); closeModal(true); await openSaleDrawer(s.id, { onBack }); }
       catch (e) { toast(e.message, 'err'); }
     };
   });
@@ -148,20 +155,21 @@ function bindIntlBlock(root, s) {
     ev.preventDefault();
     try {
       await api.addItineraryItem(s.id, { type: form.type.value, time: form.time.value, title: form.title.value });
-      closeModal(true); await openSaleDrawer(s.id);
+      closeModal(true); await openSaleDrawer(s.id, { onBack });
     } catch (e) { toast(e instanceof HttpError && e.details ? Object.values(e.details)[0] : e.message, 'err'); }
   };
   const cv = $('[data-client-view]', root);
-  if (cv) cv.onclick = () => { closeModal(true); openClientView(s.id); };
+  if (cv) cv.onclick = () => { closeModal(true); openClientView(s.id, { onBack: () => openSaleDrawer(s.id, { onBack }) }); };
   const rq = $('[data-open-req]', root);
-  if (rq) rq.onclick = () => { closeModal(true); openRequirementsModal(s.id); };
+  if (rq) rq.onclick = () => { closeModal(true); openRequirementsModal(s.id, { onBack: () => openSaleDrawer(s.id, { onBack }) }); };
   const rem = $('[data-remind]', root);
   if (rem) rem.onclick = async () => {
     rem.disabled = true;
     try {
       await api.sendReminder(s.id, { channel: 'whatsapp', note: s.travelReason });
-      toast('Recordatorio enviado al cliente (demo).');
-      closeModal(true); await openSaleDrawer(s.id);
+      openOutreach('whatsapp', { phone: s.client.phone, text: reminderMessage(s) });
+      toast('Recordatorio registrado. Se abrió WhatsApp con el mensaje listo para enviar.');
+      closeModal(true); await openSaleDrawer(s.id, { onBack });
     } catch (e) { toast(e.message, 'err'); rem.disabled = false; }
   };
 }
@@ -169,7 +177,7 @@ function bindIntlBlock(root, s) {
 /* ------------------------------------------------------------------ */
 /* Módulo 5: Cliente preparado para viajar (vista de solo lectura)    */
 /* ------------------------------------------------------------------ */
-export async function openClientView(id) {
+export async function openClientView(id, { onBack } = {}) {
   let s;
   try { s = await api.sale(id); } catch (e) { toast(e.message, 'err'); return; }
   const left = daysBetween(shared.meta.today, s.travelDate);
@@ -187,13 +195,13 @@ export async function openClientView(id) {
     <div class="person"><span class="avatar" style="--s:40px;background:#f28c28" aria-hidden="true">${esc((shared.meta.agent.name || '?')[0])}</span>
       <div><strong>${esc(shared.meta.agent.name)}</strong><small>Tu agente · ${esc(shared.meta.agent.role)}</small></div></div>
     <p class="hint">Así es como lo ve tu cliente: tú vendes, nosotros operamos y tu cliente lo siente.</p>`,
-  { label: `Vista del cliente ${s.id}` });
+  { label: `Vista del cliente ${s.id}`, onBack });
 }
 
 /* ------------------------------------------------------------------ */
 /* Módulo 3: Travel Requirements (semáforo migratorio)                */
 /* ------------------------------------------------------------------ */
-export async function openRequirementsModal(id) {
+export async function openRequirementsModal(id, { onBack } = {}) {
   const r = await api.requirements(id);
   const draw = (data) => `
     <div class="drawer-head"><p class="eyebrow">Requisitos · ${esc(data.saleId)}</p><h2>${esc(data.destination)}${data.country ? `, ${esc(data.country)}` : ''}</h2></div>
@@ -207,7 +215,7 @@ export async function openRequirementsModal(id) {
         <option value="no_aplica" ${it.status === 'no_aplica' ? 'selected' : ''}>No aplica</option>
       </select></li>`).join('')}</ul>`;
   openModal(draw(r), {
-    label: `Requisitos de viaje ${r.saleId}`,
+    label: `Requisitos de viaje ${r.saleId}`, onBack,
     onMount: (root) => {
       $$('[data-req]', root).forEach((sel) => {
         sel.onchange = async () => {
@@ -232,13 +240,13 @@ export function openQuote() {
       <label class="field"><span>Destino</span><input list="dest-list" name="destination" placeholder="Ej. Cancún" autocomplete="off"></label>
       <div class="row2">
         <label class="field"><span>Pasajeros</span><input type="number" name="pax" min="1" max="30" value="2" inputmode="numeric"></label>
-        <label class="field"><span>Precio por persona (S/)</span><input type="number" name="price" min="0" step="0.01" placeholder="0" inputmode="decimal"></label>
+        <label class="field"><span>Precio por persona (US$)</span><input type="number" name="price" min="0" step="0.01" placeholder="0" inputmode="decimal"></label>
       </div>
-      <label class="field"><span>Costo por persona (S/)</span><input type="number" name="cost" min="0" step="0.01" placeholder="0" inputmode="decimal"></label>
+      <label class="field"><span>Costo por persona (US$)</span><input type="number" name="cost" min="0" step="0.01" placeholder="0" inputmode="decimal"></label>
       <div class="calc" aria-live="polite">
-        <div><span>Total a cotizar</span><strong data-o="total">S/ 0</strong></div>
-        <div><span>Utilidad</span><strong data-o="profit">S/ 0</strong></div>
-        <div class="hl"><span>Tu comisión (${Math.round(COMMISSION_RATE * 100)}%)</span><strong data-o="comm">S/ 0</strong></div>
+        <div><span>Total a cotizar</span><strong data-o="total">$0</strong></div>
+        <div><span>Utilidad</span><strong data-o="profit">$0</strong></div>
+        <div class="hl"><span>Tu comisión (${Math.round(COMMISSION_RATE * 100)}%)</span><strong data-o="comm">$0</strong></div>
       </div>
       <p class="err" data-o="warn" role="alert"></p>
       <button type="button" class="btn primary block" data-use disabled>Usar en una venta ${icon.arrow}</button>
@@ -328,8 +336,8 @@ export async function inicio(root) {
       <div class="card-head"><h2>Mis resultados</h2>${monthSelect('dash-month', d.month)}</div>
       <div class="kpis">
         <div class="kpi"><span>Ventas cerradas</span><strong data-count="${d.kpi.closed}" data-f="int">0</strong>${delta(d.delta.closed)}</div>
-        <div class="kpi"><span>Ingresos generados</span><strong data-count="${d.kpi.income}" data-f="money">S/ 0</strong>${delta(d.delta.income)}</div>
-        <div class="kpi"><span>Comisión estimada</span><strong data-count="${d.kpi.commission}" data-f="money">S/ 0</strong>${delta(d.delta.commission)}</div>
+        <div class="kpi"><span>Ingresos generados</span><strong data-count="${d.kpi.income}" data-f="money">$0</strong>${delta(d.delta.income)}</div>
+        <div class="kpi"><span>Comisión estimada</span><strong data-count="${d.kpi.commission}" data-f="money">$0</strong>${delta(d.delta.commission)}</div>
       </div>
       <h3 class="mini-title">Comisión de los últimos 6 meses</h3>
       ${barChart(d.series, d.month)}
@@ -426,8 +434,8 @@ export async function venta(root) {
           <button type="button" class="icon-btn" data-pax="1" aria-label="Más pasajeros">+</button></div>${fieldErr(e, 'passengers')}</div></div>`;
     } else if (w.step === 3) {
       body = `<h2>Detalles económicos</h2><p class="sub">Con el costo del proveedor calculamos tu utilidad y tu comisión al instante.</p>
-        <div class="row2"><label class="field"><span>Monto de venta (S/)</span><input data-f="amount" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(d.amount)}" placeholder="4850" ${inv('amount')}>${fieldErr(e, 'amount')}</label>
-        <label class="field"><span>Costo del proveedor (S/)</span><input data-f="cost" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(d.cost)}" placeholder="4180" ${inv('cost')}>${fieldErr(e, 'cost')}</label></div>
+        <div class="row2"><label class="field"><span>Monto de venta (US$)</span><input data-f="amount" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(d.amount)}" placeholder="4850" ${inv('amount')}>${fieldErr(e, 'amount')}</label>
+        <label class="field"><span>Costo del proveedor (US$)</span><input data-f="cost" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(d.cost)}" placeholder="4180" ${inv('cost')}>${fieldErr(e, 'cost')}</label></div>
         <div class="calc" id="calc" aria-live="polite">
           <div><span>Utilidad</span><strong data-o="profit">${money(m.profit)}</strong></div>
           <div><span>Margen</span><strong data-o="margin">${+d.amount > 0 ? Math.round((m.profit / d.amount) * 100) : 0}%</strong></div>
@@ -724,12 +732,19 @@ async function openClientDrawer(id) {
       $$('[data-send-pkg]', r).forEach((b) => {
         b.onclick = async () => {
           b.disabled = true;
+          const pkg = c.recommendedPackages.find((p) => p.id === b.dataset.sendPkg);
+          const channel = b.dataset.channel;
+          const text = `Hola ${c.name.split(' ')[0]}, te queremos recomendar un viaje a ${pkg.destination}, ${pkg.country} (desde ${money(pkg.priceFrom)}). ${pkg.reason}`;
           try {
-            await api.sendClientSuggestion(id, { channel: b.dataset.channel, packageIds: [b.dataset.sendPkg], note: b.dataset.reason });
-            toast(`Sugerencia enviada por ${b.dataset.channel === 'whatsapp' ? 'WhatsApp' : 'correo'} (demo).`);
+            await api.sendClientSuggestion(id, { channel, packageIds: [b.dataset.sendPkg], note: b.dataset.reason });
+            const opened = openOutreach(channel, { phone: c.phone, email: c.email, subject: `Una recomendación de viaje para ti: ${pkg.destination}`, text });
+            toast(opened ? `Sugerencia registrada. Se abrió ${channel === 'whatsapp' ? 'WhatsApp' : 'tu correo'} con el mensaje listo para enviar.` : `Sugerencia registrada (el cliente no tiene ${channel === 'whatsapp' ? 'teléfono' : 'correo'}).`);
             closeModal(true); await openClientDrawer(id);
           } catch (e) { toast(e.message, 'err'); b.disabled = false; }
         };
+      });
+      $$('[data-sale]', r).forEach((b) => {
+        b.onclick = (e) => { e.stopPropagation(); closeModal(true); openSaleDrawer(b.dataset.sale, { onBack: () => openClientDrawer(id) }); };
       });
     },
   });
@@ -762,32 +777,47 @@ function openClientForm(onDone, existing = null) {
 /* Comisiones                                                         */
 /* ------------------------------------------------------------------ */
 let commMonth = null;
+let commView = 'mensual'; // 'mensual' | 'anual'
+let commYear = null;
+const yearSelect = (id, years, current) => `<label class="sel-wrap"><span class="sr-only">Año</span>
+  <select id="${id}" class="select">${years.map((y) => `<option value="${y}" ${y === current ? 'selected' : ''}>${y}</option>`).join('')}</select></label>`;
+
 export async function comisiones(root) {
   commMonth = commMonth || shared.meta.today.slice(0, 7);
-  const c = await api.commissions(commMonth);
+  const c = commView === 'anual'
+    ? await api.annualCommissions(commYear || undefined)
+    : await api.commissions(commMonth);
+  if (commView === 'anual') commYear = c.year;
   const S = c.summary;
-  root.innerHTML = `${pageHead('Mis comisiones', 'Consulta tus ingresos y el detalle de tus comisiones.', `${monthSelect('cm-month', c.month)}<button class="btn ghost" id="csv" ${c.rows.length ? '' : 'disabled'}>${icon.download} Exportar CSV</button>`)}
+  const toggle = `<div class="seg" role="group" aria-label="Periodo">
+    <button type="button" class="seg-btn ${commView === 'mensual' ? 'on' : ''}" data-view="mensual">Mensual</button>
+    <button type="button" class="seg-btn ${commView === 'anual' ? 'on' : ''}" data-view="anual">Anual</button>
+  </div>`;
+  const picker = commView === 'anual' ? yearSelect('cm-year', c.years, c.year) : monthSelect('cm-month', c.month);
+  root.innerHTML = `${pageHead('Mis comisiones', 'Consulta tus ingresos y el detalle de tus comisiones.', `${toggle}${picker}<button class="btn ghost" id="csv" ${c.rows.length ? '' : 'disabled'}>${icon.download} Exportar CSV</button>`)}
     <div class="kpis three">
-      <div class="kpi ic"><span class="qi c-green">${icon.coin}</span><div><span>Comisión generada</span><strong data-count="${S.generated}" data-f="money">S/ 0</strong></div></div>
+      <div class="kpi ic"><span class="qi c-green">${icon.coin}</span><div><span>Comisión generada</span><strong data-count="${S.generated}" data-f="money">$0</strong></div></div>
       <div class="kpi ic"><span class="qi c-purple">${icon.check}</span><div><span>Ventas cerradas</span><strong data-count="${S.closed}" data-f="int">0</strong></div></div>
-      <div class="kpi ic"><span class="qi c-orange">${icon.ops}</span><div><span>Comisión en proceso</span><strong data-count="${S.pending}" data-f="money">S/ 0</strong></div></div>
+      <div class="kpi ic"><span class="qi c-orange">${icon.ops}</span><div><span>Comisión en proceso</span><strong data-count="${S.pending}" data-f="money">$0</strong></div></div>
     </div>
     <div class="grid-2">
-      <section class="card"><h2>Evolución de tu comisión</h2>${barChart(c.series, c.month)}</section>
+      <section class="card"><h2>${commView === 'anual' ? `Comisión mes a mes · ${esc(c.year)}` : 'Evolución de tu comisión'}</h2>${barChart(c.series, c.month)}</section>
       <section class="card explain"><h2>${icon.bulb} ¿Cómo se calcula?</h2>
         <p>Tu comisión es el <strong>${Math.round(c.rate * 100)}% de la utilidad</strong> de cada venta (monto de venta − costo del proveedor).</p>
         <p>Pasa de <span class="badge st-en_proceso">En proceso</span> a <span class="badge st-confirmada">Pagada</span> cuando la venta queda confirmada.</p>
         <div class="paid-total"><span>Ya cobrado (histórico)</span><strong>${money(c.allTime.paid)}</strong></div></section>
     </div>
-    <section class="card"><h2>Detalle del mes</h2>
+    <section class="card"><h2>${commView === 'anual' ? `Detalle del año ${esc(c.year)}` : 'Detalle del mes'}</h2>
       ${c.rows.length ? `<div class="table-wrap"><table class="table cardify"><thead><tr><th>Fecha</th><th>Cliente</th><th>Destino</th><th class="num">Monto de venta</th><th class="num">Utilidad</th><th class="num">Comisión</th><th>Estado</th></tr></thead><tbody>
       ${c.rows.map((r) => `<tr data-sale="${esc(r.id)}" tabindex="0"><td data-label="Fecha">${esc(fmtDate(r.saleDate))}</td><td data-label="Cliente">${esc(r.client.name)}</td><td data-label="Destino">${esc(r.destination)}</td>
         <td class="num" data-label="Monto de venta">${money(r.amount)}</td><td class="num" data-label="Utilidad">${money(r.profit)}</td><td class="num" data-label="Comisión"><strong>${money(r.commission)}</strong></td><td data-label="Estado">${commBadge(r.commissionStatus)}</td></tr>`).join('')}</tbody></table></div>`
-        : empty('Sin ventas este mes', 'Cuando registres ventas, tus comisiones aparecerán aquí.', '<a class="btn primary" href="#/venta">Registrar venta</a>')}</section>`;
+        : empty(commView === 'anual' ? 'Sin ventas este año' : 'Sin ventas este mes', 'Cuando registres ventas, tus comisiones aparecerán aquí.', '<a class="btn primary" href="#/venta">Registrar venta</a>')}</section>`;
   $$('[data-count]', root).forEach((el) => countUp(el, +el.dataset.count, el.dataset.f === 'money' ? money : (v) => String(Math.round(v))));
-  $('#cm-month', root).onchange = (e) => { commMonth = e.target.value; comisiones(root); };
+  $$('[data-view]', root).forEach((b) => { b.onclick = () => { commView = b.dataset.view; comisiones(root); }; });
+  $('#cm-month', root)?.addEventListener('change', (e) => { commMonth = e.target.value; comisiones(root); });
+  $('#cm-year', root)?.addEventListener('change', (e) => { commYear = e.target.value; comisiones(root); });
   const csv = $('#csv', root);
-  if (csv) csv.onclick = () => downloadCSV(`comisiones-${c.month}.csv`, [['Fecha', 'Cliente', 'Destino', 'Monto de venta', 'Utilidad', 'Comisión', 'Estado'],
+  if (csv) csv.onclick = () => downloadCSV(`comisiones-${commView === 'anual' ? c.year : c.month}.csv`, [['Fecha', 'Cliente', 'Destino', 'Monto de venta', 'Utilidad', 'Comisión', 'Estado'],
     ...c.rows.map((r) => [r.saleDate, r.client.name, r.destination, r.amount, r.profit, r.commission, r.commissionStatus === 'pagada' ? 'Pagada' : 'En proceso'])]);
   shared.refresh = () => comisiones(root);
 }

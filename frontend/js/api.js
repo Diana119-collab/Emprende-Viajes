@@ -89,6 +89,7 @@ export const api = {
   // Perfil del viajero y paquetes sugeridos
   sendClientSuggestion: (id, payload) => run('POST', `/clients/${id}/suggestions`, payload, (e) => e.sendClientSuggestion(id, payload)),
   commissions: (month) => run('GET', `/commissions${qs({ month })}`, null, (e) => e.commissions(month)),
+  annualCommissions: (year) => run('GET', `/commissions/annual${qs({ year })}`, null, (e) => e.annualCommissions(year)),
   training: () => run('GET', '/training', null, (e) => e.training()),
   toggleLesson: (id) => run('POST', `/training/lessons/${id}/toggle`, {}, (e) => e.toggleLesson(id)),
   tickets: () => run('GET', '/tickets', null, (e) => e.listTickets()),

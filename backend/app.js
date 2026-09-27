@@ -66,6 +66,7 @@ export function createApp(store) {
     ['GET', '/api/clients/:id/profile', ({ params }) => ({ data: { profile: engine().travelerProfile(params.id), recommendedPackages: engine().suggestPackages(params.id) } })],
     ['POST', '/api/clients/:id/suggestions', ({ params, body }) => ({ status: 201, data: engine().sendClientSuggestion(params.id, body) })],
     ['GET', '/api/commissions', ({ query }) => ({ data: engine().commissions(query.get('month') || undefined) })],
+    ['GET', '/api/commissions/annual', ({ query }) => ({ data: engine().annualCommissions(query.get('year') ? Number(query.get('year')) : undefined) })],
     ['GET', '/api/training', () => ({ data: engine().training() })],
     ['POST', '/api/training/lessons/:id/toggle', ({ params }) => ({ data: engine().toggleLesson(params.id) })],
     ['GET', '/api/tickets', () => ({ data: engine().listTickets() })],

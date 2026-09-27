@@ -129,6 +129,9 @@ button { cursor: pointer; }
 .chart .bar { outline: none; } .chart .bar-v { font-size: 11px; fill: var(--muted); font-weight: 700; } .chart .bar-l { font-size: 12px; fill: var(--muted); text-transform: capitalize; }
 .select { border: 1px solid var(--line); background: var(--field); border-radius: 10px; padding: 9px 12px; min-height: 42px; }
 .sel-wrap { display: inline-block; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; background: var(--field); }
+.seg-btn { border: none; background: transparent; color: var(--muted); font-weight: 700; font-size: .85rem; padding: 7px 14px; border-radius: 8px; cursor: pointer; }
+.seg-btn.on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .next-body { display: flex; gap: 14px; margin: 14px 0; align-items: flex-start; } .next-body p { color: var(--muted); font-size: .92rem; } .next-body .badge { margin-top: 8px; }
 .next-ico { width: 54px; height: 54px; border-radius: 14px; background: linear-gradient(135deg, var(--teal), var(--navy-2)); color: #fff; display: grid; place-items: center; flex: none; } .next-ico .ico { width: 28px; height: 28px; }
 .when { display: flex; align-items: center; gap: 6px; margin-top: 2px; } .when .ico { width: 16px; height: 16px; }
@@ -217,6 +220,8 @@ div.bar { height: 8px; background: var(--line); border-radius: 99px; overflow: h
 @keyframes pop-in { from { opacity: 0; transform: translate(-50%, -46%) scale(.97); } }
 .modal.drawer { left: auto; right: 0; top: 0; transform: none; height: 100vh; max-height: none; width: min(460px, 100vw); border-radius: 22px 0 0 22px; animation: slide .28s cubic-bezier(.2, .8, .2, 1) both; } @keyframes slide { from { transform: translateX(100%); } }
 .modal-x { position: absolute; right: 14px; top: 14px; } .modal-body { display: grid; gap: 16px; } .modal-body > h2 { font-size: 1.3rem; } .drawer-head { display: grid; gap: 6px; justify-items: start; padding-right: 44px; } .drawer-head h2 { font-size: 1.4rem; }
+.modal-back { position: absolute; left: 14px; top: 14px; }
+.modal:has(.modal-back) .drawer-head { padding-left: 40px; }
 .person { display: flex; gap: 14px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: 14px; } .contact { display: grid; gap: 2px; margin-top: 2px; } .contact a { display: flex; gap: 8px; align-items: center; text-decoration: none; color: var(--teal-ink); font-size: .92rem; } .contact .ico { width: 16px; height: 16px; }
 .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; } .timeline li { display: flex; gap: 14px; padding-bottom: 16px; position: relative; color: var(--muted); }
 .timeline li:not(:last-child)::before { content: ""; position: absolute; left: 15px; top: 32px; bottom: 0; width: 2px; background: var(--line); } .timeline li.done:not(:last-child)::before { background: var(--teal); }

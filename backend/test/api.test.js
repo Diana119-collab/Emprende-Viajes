@@ -186,6 +186,16 @@ test('Recordatorio al cliente: se registra con fecha y queda en el historial de 
   assert.ok(r.body.reminders[0].at);
 });
 
+test('Comisiones anuales: agrupa el año completo por mes y lista los años disponibles', async () => {
+  const created = (await j('POST', '/sales', validSale())).body;
+  const year = Number(created.saleDate.slice(0, 4));
+  const r = await j('GET', `/commissions/annual?year=${year}`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.series.length, 12);
+  assert.ok(r.body.years.includes(String(year)));
+  assert.ok(r.body.rows.some((x) => x.id === created.id));
+});
+
 test('Editar cliente: PATCH actualiza sus datos y los propaga a sus ventas', async () => {
   const created = (await j('POST', '/sales', validSale())).body;
   const r = await j('PATCH', `/clients/${created.clientId}`, { name: 'María Pérez G.', phone: '999 111 222', email: 'maria.g@mail.com' });

@@ -73,3 +73,14 @@ test('travelerProfile detecta el gusto por playa y sugiere paquetes acordes; edi
   assert.equal(sent.suggestions.length, 1);
   assert.equal(sent.suggestions[0].packages[0].id, suggestions[0].id);
 });
+
+test('annualCommissions agrega los 12 meses del año y lista los años con datos', () => {
+  const db = seedDb();
+  const engine = createEngine(db, { save: () => {} });
+  const thisYear = Number(db.sales[0].saleDate.slice(0, 4));
+  const annual = engine.annualCommissions(thisYear);
+  assert.equal(annual.series.length, 12);
+  assert.ok(annual.years.includes(String(thisYear)));
+  const monthly = annual.series.reduce((sum, m) => sum + m.commission, 0);
+  assert.ok(Math.abs(monthly - annual.summary.generated) < 0.01);
+});
