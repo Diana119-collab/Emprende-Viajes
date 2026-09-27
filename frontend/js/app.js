@@ -131,8 +131,13 @@ function startLogin() {
     pwToggle.textContent = show ? 'Ocultar' : 'Mostrar';
     form.password.focus();
   };
+  // Si por algún motivo el navegador llegó a enviar el formulario de forma nativa
+  // (por ejemplo, un gestor de contraseñas), esto limpia cualquier rastro de la
+  // contraseña en la URL antes de seguir.
+  if (location.search) history.replaceState(null, '', location.pathname + location.hash);
   form.onsubmit = (ev) => {
     ev.preventDefault();
+    if (location.search) history.replaceState(null, '', location.pathname + location.hash);
     if (form.password.value.trim().toLowerCase() === DEMO_PASSWORD) {
       try { sessionStorage.setItem(AUTH_KEY, '1'); } catch { /* modo privado: se pedirá de nuevo al recargar */ }
       screen.hidden = true;
