@@ -83,11 +83,6 @@ async function boot() {
     toast('Datos de ejemplo restablecidos');
     render();
   };
-  $('#logout-btn').onclick = () => {
-    try { sessionStorage.removeItem(AUTH_KEY); } catch { /* modo privado */ }
-    location.reload();
-  };
-
   // Delegación global: abrir detalle de venta desde cualquier lista.
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-sale]');
@@ -100,55 +95,11 @@ async function boot() {
   });
 
   window.addEventListener('hashchange', render);
-  $('#boot')?.remove(); // ya se pudo haber quitado antes, al mostrar el login
+  $('#boot')?.remove();
   render();
 }
 
-/* ---------- acceso (MVP: contraseña temporal, pendiente de login real del back office) ---------- */
-const AUTH_KEY = 'ev-auth';
-const DEMO_PASSWORD = 'admin';
-const isAuthed = () => { try { return sessionStorage.getItem(AUTH_KEY) === '1'; } catch { return true; } };
-
-function startApp() {
-  $('#app').hidden = false;
-  boot().catch((e) => {
-    console.error(e);
-    const box = $('#boot') || $('#app');
-    if (box) box.innerHTML = `<p>No pudimos iniciar la aplicación.</p><pre>${esc(e.message)}</pre>`;
-  });
-}
-
-function startLogin() {
-  $('#boot')?.remove();
-  const screen = $('#login-screen');
-  screen.hidden = false;
-  const form = $('#login-form', screen);
-  const err = $('#login-err', screen);
-  const pwToggle = $('[data-pw-toggle]', screen);
-  if (pwToggle) pwToggle.onclick = () => {
-    const show = form.password.type === 'password';
-    form.password.type = show ? 'text' : 'password';
-    pwToggle.textContent = show ? 'Ocultar' : 'Mostrar';
-    form.password.focus();
-  };
-  // Si por algún motivo el navegador llegó a enviar el formulario de forma nativa
-  // (por ejemplo, un gestor de contraseñas), esto limpia cualquier rastro de la
-  // contraseña en la URL antes de seguir.
-  if (location.search) history.replaceState(null, '', location.pathname + location.hash);
-  form.onsubmit = (ev) => {
-    ev.preventDefault();
-    if (location.search) history.replaceState(null, '', location.pathname + location.hash);
-    if (form.password.value.trim().toLowerCase() === DEMO_PASSWORD) {
-      try { sessionStorage.setItem(AUTH_KEY, '1'); } catch { /* modo privado: se pedirá de nuevo al recargar */ }
-      screen.hidden = true;
-      startApp();
-    } else {
-      err.textContent = 'Contraseña incorrecta. Usa "admin" (acceso temporal de demo).';
-      form.password.value = '';
-      form.password.focus();
-    }
-  };
-  form.password.focus();
-}
-
-if (isAuthed()) startApp(); else startLogin();
+boot().catch((e) => {
+  console.error(e);
+  $('#boot').innerHTML = `<p>No pudimos iniciar la aplicación.</p><pre>${esc(e.message)}</pre>`;
+});

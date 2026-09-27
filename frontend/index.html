@@ -16,24 +16,7 @@
 <body>
   <a class="skip" href="#view">Saltar al contenido</a>
 
-  <div class="login-screen" id="login-screen" hidden>
-    <form class="login-card" id="login-form" novalidate>
-      <svg viewBox="0 0 40 40" width="44" height="44" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#12a5a5"/><path d="M8 21l24-11-8 20-4-8z" fill="#fff"/></svg>
-      <h1>Emprende Viajes</h1>
-      <p class="sub">Acceso de agente. Ingresa tu contraseña para continuar.</p>
-      <label class="field"><span>Contraseña</span>
-        <div class="pw-wrap">
-          <input type="password" name="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="••••••" autofocus>
-          <button type="button" class="pw-toggle" data-pw-toggle>Mostrar</button>
-        </div>
-      </label>
-      <p class="err" id="login-err" role="alert"></p>
-      <button class="btn primary block" type="submit">Ingresar</button>
-      <p class="hint">MVP: contraseña temporal <strong>admin</strong>. Se reemplazará por el login real del back office.</p>
-    </form>
-  </div>
-
-  <div class="app" id="app" hidden>
+  <div class="app" id="app">
     <aside class="sidebar" id="sidebar" aria-label="Navegación principal">
       <a class="brand" href="#/inicio" aria-label="Emprende Viajes, ir al inicio">
         <svg viewBox="0 0 40 40" width="38" height="38" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#12a5a5"/><path d="M8 21l24-11-8 20-4-8z" fill="#fff"/></svg>
@@ -43,7 +26,6 @@
       <div class="side-foot">
         <button class="side-btn" id="theme-btn" type="button"></button>
         <button class="side-btn" id="reset-btn" type="button">Restablecer datos demo</button>
-        <button class="side-btn" id="logout-btn" type="button">Cerrar sesión</button>
         <p class="mode" id="mode-badge"></p>
         <div class="agent" id="agent"></div>
       </div>

@@ -16,10 +16,6 @@ MVP basado en el pitch de Opera Ligero (Startup Weekend): el agente registra ven
 | **Soporte** | Preguntas frecuentes y solicitudes al back office |
 | Extras | Cotizador rápido, modo oscuro, diseño responsive, accesible por teclado |
 
-### Acceso
-
-MVP: pantalla de acceso con **contraseña temporal `admin`** (validada en el navegador, sin backend de autenticación todavía). Es un candado provisional para no dejar la demo abierta a cualquiera; el siguiente paso natural es un login real contra el back office, con usuarios por agente. La sesión se guarda en `sessionStorage` (se cierra al cerrar la pestaña) y hay un botón "Cerrar sesión" en el menú lateral.
-
 ### Módulos de viaje internacional
 
 | Módulo | Qué hace |
@@ -103,7 +99,7 @@ Los errores de validación devuelven `400` con `{ error, details: { campo: mensa
 
 ## Límites actuales del MVP (a decidir en el piloto)
 
-- **Sin autenticación real ni multiusuario**: la pantalla de acceso con contraseña `admin` es solo un candado de demo (se valida en el navegador); hay un solo agente ("Magda"). El siguiente paso natural es login real y un panel de back office.
+- **Sin autenticación ni multiusuario**: hay un solo agente ("Magda"). El siguiente paso natural es login y un panel de back office.
 - **Los recordatorios al cliente son simulados**: quedan registrados en la venta, pero no se envía un WhatsApp/correo real todavía; falta conectar un proveedor de mensajería.
 - **Los estados de las ventas los cambia el back office** en la operación real; el botón "Simular avance" del detalle es solo para demostración.
 - **La comisión pasa a "Pagada" al confirmar la venta** (constante `COMMISSION_PAID_FROM`); ajústala a la política real de pagos.
