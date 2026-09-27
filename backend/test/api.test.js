@@ -1,0 +1,128 @@
+import { test, before, after, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import { createApp } from '../app.js';
+import { createMemoryStore } from '../store.js';
+import { toISO, addDays, computeSaleMoney } from '../../frontend/js/core.js';
+
+let server, base, store;
+const j = async (method, url, body) => {
+  const r = await fetch(base + url, {
+    method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
+  });
+  return { status: r.status, body: await r.json() };
+};
+const future = (n = 30) => toISO(addDays(new Date(), n));
+const validSale = (over = {}) => ({
+  client: { name: 'María Pérez', phone: '999 111 222', email: 'maria@mail.com' },
+  destination: 'Cancún', country: 'México', travelDate: future(), passengers: 2, amount: 5000, cost: 4400, ...over,
+});
+
+before(async () => {
+  store = createMemoryStore();
+  server = http.createServer(createApp(store));
+  await new Promise((res) => server.listen(0, res));
+  base = `http://127.0.0.1:${server.address().port}/api`;
+});
+after(() => server.close());
+beforeEach(() => j('POST', '/reset'));
+
+test('health responde ok', async () => {
+  const r = await j('GET', '/health');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.ok, true);
+});
+
+test('comisión = 30% de la utilidad', () => {
+  assert.deepEqual(computeSaleMoney(5000, 4400), { profit: 600, commission: 180 });
+  assert.deepEqual(computeSaleMoney(1000, 1200), { profit: 0, commission: 0 });
+});
+
+test('crear venta calcula utilidad/comisión y crea al cliente nuevo', async () => {
+  const before = (await j('GET', '/clients')).body.items.length;
+  const r = await j('POST', '/sales', validSale());
+  assert.equal(r.status, 201);
+  assert.equal(r.body.profit, 600);
+  assert.equal(r.body.commission, 180);
+  assert.equal(r.body.status, 'en_proceso');
+  assert.match(r.body.id, /^V-\d+$/);
+  assert.equal((await j('GET', '/clients')).body.items.length, before + 1);
+});
+
+test('una venta a un cliente existente (mismo teléfono) no lo duplica', async () => {
+  const before = (await j('GET', '/clients')).body.items.length;
+  await j('POST', '/sales', validSale({ client: { name: 'Laura García', phone: '987654321', email: '' } }));
+  assert.equal((await j('GET', '/clients')).body.items.length, before);
+});
+
+test('validación: devuelve 400 con detalle por campo', async () => {
+  const r = await j('POST', '/sales', validSale({
+    client: { name: 'A', phone: '12', email: 'mal' }, travelDate: '2020-01-01', passengers: 0, amount: 100, cost: 500,
+  }));
+  assert.equal(r.status, 400);
+  for (const k of ['name', 'phone', 'email', 'travelDate', 'passengers', 'cost']) assert.ok(r.body.details[k], `falta error de ${k}`);
+});
+
+test('listar ventas filtra por estado y busca por texto', async () => {
+  const all = (await j('GET', '/sales')).body;
+  assert.equal(all.counts.todas, all.items.length);
+  const proc = (await j('GET', '/sales?status=en_proceso')).body;
+  assert.ok(proc.items.length > 0 && proc.items.every((s) => s.status === 'en_proceso'));
+  const q = (await j('GET', '/sales?q=cancun')).body; // sin tilde
+  assert.ok(q.items.length > 0 && q.items.every((s) => s.destination === 'Cancún'));
+});
+
+test('cambiar estado registra historial y valida el estado', async () => {
+  const created = (await j('POST', '/sales', validSale())).body;
+  const r = await j('PATCH', `/sales/${created.id}/status`, { status: 'confirmada' });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.commissionStatus, 'pagada');
+  assert.equal(r.body.history.length, 2);
+  assert.equal((await j('PATCH', `/sales/${created.id}/status`, { status: 'nada' })).status, 400);
+  assert.equal((await j('PATCH', '/sales/V-0/status', { status: 'confirmada' })).status, 404);
+});
+
+test('dashboard: KPIs del mes consistentes con las ventas', async () => {
+  const d = (await j('GET', '/dashboard')).body;
+  const month = d.month;
+  const sales = (await j('GET', '/sales')).body.items.filter((s) => s.saleDate.startsWith(month));
+  assert.equal(d.kpi.closed, sales.length);
+  assert.equal(d.kpi.income, sales.reduce((t, s) => t + s.amount, 0));
+  assert.equal(d.series.length, 6);
+});
+
+test('comisiones: generada = pagada + en proceso', async () => {
+  const c = (await j('GET', '/commissions')).body;
+  assert.equal(Math.round((c.summary.paid + c.summary.pending) * 100), Math.round(c.summary.generated * 100));
+  assert.equal(c.rate, 0.3);
+});
+
+test('capacitación: alternar lección actualiza el progreso', async () => {
+  const t0 = (await j('GET', '/training')).body;
+  const lesson = t0.courses.flatMap((c) => c.lessons).find((l) => !l.done);
+  const t1 = (await j('POST', `/training/lessons/${lesson.id}/toggle`)).body;
+  assert.equal(t1.overall.completed, t0.overall.completed + 1);
+  assert.equal((await j('POST', '/training/lessons/L-999/toggle')).status, 404);
+});
+
+test('tickets: crear con validación y respuesta automática', async () => {
+  assert.equal((await j('POST', '/tickets', { subject: '', message: '' })).status, 400);
+  const r = await j('POST', '/tickets', { subject: 'Duda con un voucher', message: 'No me llegó el voucher', category: 'Reservas', priority: 'alta' });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.status, 'abierto');
+  assert.equal(r.body.replies.length, 1);
+});
+
+test('clientes: crear, rechazar duplicado y ver detalle', async () => {
+  const c = await j('POST', '/clients', { name: 'Nuevo Cliente', phone: '955 000 111', email: '' });
+  assert.equal(c.status, 201);
+  assert.equal((await j('POST', '/clients', { name: 'Otro Nombre', phone: '955000111' })).status, 409);
+  const detail = await j('GET', `/clients/${c.body.id}`);
+  assert.deepEqual(detail.body.sales, []);
+});
+
+test('rutas inexistentes y JSON roto devuelven errores limpios', async () => {
+  assert.equal((await j('GET', '/nada')).status, 404);
+  const r = await fetch(`${base}/sales`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{malo' });
+  assert.equal(r.status, 400);
+});

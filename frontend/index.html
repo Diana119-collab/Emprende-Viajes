@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emprende Viajes</title>
+  <meta name="description" content="Plataforma para agentes de viaje: registra ventas, sigue operaciones y consulta tus comisiones. Tú vendes, nosotros operamos.">
+  <meta name="theme-color" content="#0b2c50">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b2c50'/%3E%3Cpath d='M12 34l40-18-13 32-7-13z' fill='%2312a5a5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/styles.css">
+  <script>
+    // Evita el parpadeo del tema antes de que cargue el JS.
+    try { var t = localStorage.getItem('ev-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip" href="#view">Saltar al contenido</a>
+
+  <div class="app">
+    <aside class="sidebar" id="sidebar" aria-label="Navegación principal">
+      <a class="brand" href="#/inicio" aria-label="Emprende Viajes, ir al inicio">
+        <svg viewBox="0 0 40 40" width="38" height="38" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#12a5a5"/><path d="M8 21l24-11-8 20-4-8z" fill="#fff"/></svg>
+        <span><strong>Emprende</strong><em>Viajes</em></span>
+      </a>
+      <nav><ul class="nav" id="nav"></ul></nav>
+      <div class="side-foot">
+        <button class="side-btn" id="theme-btn" type="button"></button>
+        <button class="side-btn" id="reset-btn" type="button">Restablecer datos demo</button>
+        <p class="mode" id="mode-badge"></p>
+        <div class="agent" id="agent"></div>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim" hidden></div>
+
+    <div class="content">
+      <header class="topbar">
+        <button class="icon-btn" id="menu-btn" type="button" aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <span class="topbar-title">Emprende Viajes</span>
+      </header>
+      <main id="view" tabindex="-1" class="view"></main>
+      <footer class="foot">Opera Ligero · <strong>Tú vendes. Nosotros operamos.</strong></footer>
+    </div>
+  </div>
+
+  <div id="boot" class="boot"><span class="spinner"></span> Iniciando…</div>
+  <div id="modal-root"></div>
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script type="module" src="js/app.js"></script>
+  <noscript><p style="padding:2rem">Esta aplicación necesita JavaScript.</p></noscript>
+</body>
+</html>
