@@ -123,9 +123,16 @@ function startLogin() {
   screen.hidden = false;
   const form = $('#login-form', screen);
   const err = $('#login-err', screen);
+  const pwToggle = $('[data-pw-toggle]', screen);
+  if (pwToggle) pwToggle.onclick = () => {
+    const show = form.password.type === 'password';
+    form.password.type = show ? 'text' : 'password';
+    pwToggle.textContent = show ? 'Ocultar' : 'Mostrar';
+    form.password.focus();
+  };
   form.onsubmit = (ev) => {
     ev.preventDefault();
-    if (form.password.value === DEMO_PASSWORD) {
+    if (form.password.value.trim().toLowerCase() === DEMO_PASSWORD) {
       try { sessionStorage.setItem(AUTH_KEY, '1'); } catch { /* modo privado: se pedirá de nuevo al recargar */ }
       screen.hidden = true;
       startApp();

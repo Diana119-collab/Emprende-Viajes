@@ -21,7 +21,12 @@
       <svg viewBox="0 0 40 40" width="44" height="44" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#12a5a5"/><path d="M8 21l24-11-8 20-4-8z" fill="#fff"/></svg>
       <h1>Emprende Viajes</h1>
       <p class="sub">Acceso de agente. Ingresa tu contraseña para continuar.</p>
-      <label class="field"><span>Contraseña</span><input type="password" name="password" autocomplete="current-password" placeholder="••••••" autofocus></label>
+      <label class="field"><span>Contraseña</span>
+        <div class="pw-wrap">
+          <input type="password" name="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="••••••" autofocus>
+          <button type="button" class="pw-toggle" data-pw-toggle>Mostrar</button>
+        </div>
+      </label>
       <p class="err" id="login-err" role="alert"></p>
       <button class="btn primary block" type="submit">Ingresar</button>
       <p class="hint">MVP: contraseña temporal <strong>admin</strong>. Se reemplazará por el login real del back office.</p>
